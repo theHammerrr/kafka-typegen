@@ -16,6 +16,12 @@ interface CliOptions {
   readonly configPath?: string;
 }
 
+function isDirectCliExecution(argv: readonly string[]): boolean {
+  const entrypoint = argv[1];
+
+  return typeof entrypoint === 'string' && /(?:^|[\\/])cli(?:\.[cm]?js)?$/u.test(entrypoint);
+}
+
 function parseArgs(argv: readonly string[]): CliOptions {
   let configPath: string | undefined;
 
@@ -23,10 +29,18 @@ function parseArgs(argv: readonly string[]): CliOptions {
     const argument = argv[index];
 
     if (argument === '--config') {
-      configPath = argv[index + 1];
+      const candidatePath = argv[index + 1];
+
+      if (candidatePath === undefined || candidatePath.startsWith('--')) {
+        throw new Error("The '--config' flag requires a file path.");
+      }
+
+      configPath = candidatePath;
       index += 1;
       continue;
     }
+
+    throw new Error(`Unknown CLI argument '${argument}'.`);
   }
 
   return configPath !== undefined ? { configPath } : {};
@@ -97,7 +111,7 @@ export async function runCli(argv: readonly string[] = process.argv.slice(2)): P
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (isDirectCliExecution(process.argv)) {
   runCli().then((exitCode) => {
     process.exitCode = exitCode;
   });

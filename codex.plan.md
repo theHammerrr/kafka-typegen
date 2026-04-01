@@ -2,83 +2,85 @@
 
 ## 1. Current Step
 
-- Step 9: CLI / Generator Entry Point.
-- This is the correct next step because the generator pipeline now exists end-to-end in-process, but users still cannot invoke it through a standard command that loads config, runs generation, writes output, and reports failures.
+- Step 10: End-to-End Quality Pass.
+- This is the correct next step because the core config, schema, catalog, generation, runtime, and CLI flows already exist. The remaining work is to harden the full developer experience, close critical test gaps, and polish rough edges rather than introducing another major subsystem.
 
 ## 2. Repository Assessment
 
 ### What already exists
 
-- Config normalization and validation.
-- Schema loading/parsing, canonical catalog building, type generation, and runtime integration.
-- Tests covering the internal pipeline.
+- Config validation and normalization with deterministic ordering.
+- Schema loading/parsing, catalog building, generated types, producer/consumer/client APIs, runtime integration, and a CLI.
+- Unit and integration-style coverage for most individual subsystems.
 
 ### What is missing
 
-- CLI executable entrypoint.
-- Config discovery/loading from a user config file.
-- File writing step for generated output.
-- CLI-facing error handling and output messages.
-- CLI integration tests.
+- True end-to-end coverage that exercises config -> schema load -> catalog -> generation as one coherent flow.
+- Multi-event CLI/output coverage and stronger failure-path assertions around user-facing errors.
+- Final polish for generated output readability and CLI/build ergonomics.
 
 ### Constraints and risks
 
-- Step 9 should stay focused on generation, not on expanding runtime capabilities further.
-- The CLI should be predictable and explicit; config discovery can exist, but it should not depend only on magic.
-- The config loader must support a simple authoring format without introducing a heavy bundling dependency.
+- Step 10 should not introduce speculative new features; it should harden the current surface.
+- Cleanup needs to stay targeted so we do not destabilize previously completed steps.
+- Any API polish must preserve the existing typed-client direction and keep output deterministic.
 
-## 3. Architecture Decisions (Step 9 only)
+## 3. Architecture Decisions (Step 10 only)
 
 ### Modules/files to introduce or update
 
-- `package.json`
-  - Add a `bin` entry and CLI-friendly scripts if needed.
-- `src/cli.ts`
-  - Implement the command entrypoint, argument parsing, config discovery/loading, pipeline execution, and file writes.
-- `src/index.ts`
-  - Export CLI-adjacent helpers only if needed; otherwise keep CLI private.
+- `codex.plan.md`
+  - Record the scoped quality-pass plan before implementation.
+- `tests/e2e.test.ts`
+  - Add full pipeline end-to-end coverage for single-event, multi-event, and failure flows.
 - `tests/cli.test.ts`
-  - Add CLI integration tests for config loading, generation execution, invalid config, and output paths.
-- `tests/fixtures/cli/`
-  - Add a sample config file and isolated output workspace fixtures.
+  - Expand CLI assertions where current user-facing behavior is underspecified.
+- `src/cli.ts`
+  - Improve argument validation and error messages where the current UX is weak.
+- `src/generator/type-generator.ts`
+  - Apply generated output readability or configurability polish if the end-to-end tests expose issues.
+- `tsup.config.ts`
+  - Remove the current CLI build rough edge if a minimal packaging adjustment can resolve it cleanly.
 
 ### Responsibilities
 
-- CLI: parse `--config`, support default config discovery, run the existing pipeline, write generated files to `outputDir`, and print actionable errors.
-- Tests: spawn the CLI in a temp workspace and verify written output and failure behavior.
+- End-to-end tests: assert that the complete generation pipeline is coherent for both single-event and multi-event topics.
+- CLI: provide clearer failure messages and predictable invocation behavior.
+- Generator/build polish: keep generated output readable and packaging stable without changing the product scope.
 
 ### External libraries planned
 
-- No new dependency by default. The CLI can use built-in Node APIs plus dynamic module import for a JavaScript config file.
+- No new dependencies are planned. The existing stack is sufficient for the Step 10 hardening pass.
 
 ## 4. Task Breakdown
 
-- Task 1: define the CLI invocation shape and config discovery behavior.
-- Task 2: implement config file loading and pipeline execution.
-- Task 3: implement generated file writes and helpful CLI output/errors.
-- Task 4: add CLI integration tests for explicit config loading, default discovery, invalid config failure, and output path handling.
-- Task 5: run tests, typecheck, and build until the step is stable.
+- Task 1: add end-to-end tests for single-event and multi-event full-pipeline generation.
+- Task 2: add failure-path end-to-end coverage with clear message assertions.
+- Task 3: tighten CLI argument validation and user-facing errors based on those tests.
+- Task 4: clean up any generator or packaging rough edges revealed by the quality pass.
+- Task 5: run `pnpm test`, `pnpm typecheck`, and `pnpm build` until the step is stable.
 
 ## 5. File Changes Plan
 
 ### Existing files to modify
 
 - `codex.plan.md`
-- `package.json`
+- `src/cli.ts`
+- `src/generator/type-generator.ts`
+- `tests/cli.test.ts`
+- `tsup.config.ts`
 
 ### New files expected
 
-- `src/cli.ts`
-- `tests/cli.test.ts`
-- `tests/fixtures/cli/kafka-typegen.config.mjs`
+- `tests/e2e.test.ts`
 
 ## 6. Testing Plan
 
-- CLI integration tests for:
-  - config loading via `--config`
-  - generation execution writing output files
-  - invalid config failure behavior
-  - output path behavior using the config’s `outputDir`
+- End-to-end tests for:
+  - full config -> schema -> catalog -> generation flow
+  - single-event topic output
+  - multi-event topic output
+  - failure paths with actionable messages
 - Verification:
   - `pnpm test`
   - `pnpm typecheck`
@@ -86,5 +88,6 @@
 
 ## 7. Risks / Open Questions
 
-- Config file module format needs to be explicit. Assumption: support `kafka-typegen.config.mjs` exporting either a default object or `defineConfig(...)` result.
-- Since this repo currently emits a library bundle, the CLI should remain simple and use built-in Node features rather than a separate bundling system.
+- The current CLI accepts `--config` without validating a missing value; this likely needs tightening.
+- The generated file currently hardcodes the runtime import module. If the configurable runtime module is meant to affect generated imports, Step 10 is the last reasonable place to align that behavior.
+- The current build emits a non-blocking `import.meta` warning for the CLI CJS output. I will only change packaging if it can be fixed without complicating the distribution model.

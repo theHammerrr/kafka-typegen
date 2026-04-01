@@ -1,7 +1,7 @@
 export default {
   outputDir: './generated',
   sources: {
-    rootDir: '../schemas'
+    rootDir: './schemas'
   },
   topics: [
     {
