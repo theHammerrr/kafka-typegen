@@ -66,7 +66,7 @@ const kafkaTypegenConfigSchema = z.object({
   topics: z.array(topicConfigSchema).min(1, 'At least one topic must be configured.')
 });
 
-function formatIssuePath(path: readonly (string | number)[]): string {
+function formatIssuePath(path: readonly PropertyKey[]): string {
   if (path.length === 0) {
     return 'config';
   }
@@ -76,11 +76,13 @@ function formatIssuePath(path: readonly (string | number)[]): string {
       return `${currentPath}[${segment}]`;
     }
 
-    return currentPath.length === 0 ? segment : `${currentPath}.${segment}`;
+    const segmentText = String(segment);
+
+    return currentPath.length === 0 ? segmentText : `${currentPath}.${segmentText}`;
   }, '');
 }
 
-function buildValidationIssue(path: readonly (string | number)[], message: string): ConfigValidationIssue {
+function buildValidationIssue(path: readonly PropertyKey[], message: string): ConfigValidationIssue {
   return {
     message,
     path: formatIssuePath(path)

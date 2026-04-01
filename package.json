@@ -56,7 +56,7 @@
     "tsup": "^8.3.5",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4",
-    "zod": "^3.24.2"
+    "zod": "^4.3.6"
   },
   "packageManager": "pnpm@9.12.0+sha512.4abf725084d7bcbafbd728bfc7bee61f2f791f977fd87542b3579dcb23504d170d46337945e4c66485cd12d588a0c0e570ed9c477e7ccdd8507cf05f3f92eaca"
 }
