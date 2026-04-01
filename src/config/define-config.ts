@@ -1,7 +1,7 @@
 import type { KafkaTypegenConfig, NormalizedKafkaTypegenConfig } from './types.js';
 import { normalizeConfig, validateConfig } from './schema.js';
 
-export function defineConfig(config: KafkaTypegenConfig): KafkaTypegenConfig {
+export function defineConfig<const TConfig extends KafkaTypegenConfig>(config: TConfig): TConfig {
   return config;
 }
 

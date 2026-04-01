@@ -7,17 +7,20 @@ import {
   type CatalogBuilder,
   type RuntimeProducer,
   type SchemaLoader,
+  type SubjectNameStrategy,
   type TypeGenerator
 } from '../src/index.js';
 
 describe('public entrypoint', () => {
-  it('exposes the Step 1 foundation exports', () => {
+  it('exposes the config helpers', () => {
     expect(defineConfig).toBeTypeOf('function');
     expect(resolveConfig).toBeTypeOf('function');
     expect(validateConfig).toBeTypeOf('function');
   });
 
-  it('supports importing architectural placeholder contracts', () => {
+  it('exposes Step 2 config-oriented types alongside architecture contracts', () => {
+    const strategy: SubjectNameStrategy = 'topic-event';
+
     const schemaLoader: SchemaLoader = {
       async load(source) {
         return {
@@ -46,6 +49,7 @@ describe('public entrypoint', () => {
       }
     };
 
+    expect(strategy).toBe('topic-event');
     expect(schemaLoader.load).toBeTypeOf('function');
     expect(runtimeProducer.send).toBeTypeOf('function');
     expect(generator.generate).toBeTypeOf('function');

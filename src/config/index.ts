@@ -5,10 +5,20 @@ export {
   type ConfigValidationIssue,
   type KafkaTypegenConfig,
   type KafkaTypegenEventConfig,
+  type KafkaTypegenGenerationConfig,
+  type KafkaTypegenNamingConfig,
   type KafkaTypegenRuntimeConfig,
   type KafkaTypegenSchemaRegistryConfig,
+  type KafkaTypegenSourcesConfig,
   type KafkaTypegenTopicConfig,
   type NormalizedEventConfig,
+  type NormalizedGenerationConfig,
   type NormalizedKafkaTypegenConfig,
-  type NormalizedTopicConfig
+  type NormalizedNamingConfig,
+  type NormalizedRuntimeConfig,
+  type NormalizedSchemaRegistryConfig,
+  type NormalizedSourcesConfig,
+  type NormalizedTopicConfig,
+  type RuntimeTransport,
+  type SubjectNameStrategy
 } from './types.js';

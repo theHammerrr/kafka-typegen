@@ -2,125 +2,101 @@
 
 ## 1. Current Step
 
-- Step 1: Project Foundation and Architecture.
-- This is the correct starting point because the repository currently contains only the instruction files and a minimal `README.md`. There is no source tree, no package manifest, no TypeScript setup, no test runner, and no existing generator/runtime/config implementation to extend. Step 1 explicitly covers establishing those foundations and placeholder abstractions without prematurely implementing later-step behavior.
+- Step 2: Configuration Model and Validation.
+- This is the correct next step because Step 1 established the project structure, public entrypoints, and a minimal config scaffold. The next missing capability is the real user-facing configuration contract that later schema loading, catalog building, and generation steps will depend on.
 
 ## 2. Repository Assessment
 
 ### What already exists
 
-- Repository root with `.gitignore`, `README.md`, and `instructions/`.
-- Full step-by-step implementation instructions from Step 1 through Step 10.
+- TypeScript build/test setup with `tsup`, `vitest`, and strict compiler settings.
+- Public module boundaries for `config`, `schema`, `catalog`, `generator`, and `runtime`.
+- A small config scaffold with `defineConfig(...)`, validation, normalization, and basic tests.
 
 ### What is missing
 
-- Package manager manifest and scripts.
-- TypeScript configuration and build output strategy.
-- Test runner and test configuration.
-- Source directory layout.
-- Any implementation for config, schema loading, catalog/modeling, generator, runtime, or CLI.
-- Public entrypoints and exports.
+- Full config model for topics, events, generation, naming, schema registry, runtime options, and source-root handling.
+- Validation for duplicate event names across topics.
+- Validation for invalid subject strategy / naming values.
+- Normalized config output rich enough to support later steps.
+- Tests covering single-event and multi-event topic scenarios under the fuller config shape.
 
 ### Constraints and risks
 
-- Step 1 must avoid deep implementation of generation, schema parsing, Kafka runtime logic, or CLI behavior.
-- The initial architecture needs to make later steps straightforward without introducing speculative complexity.
-- Since the repository is empty, the first pass must define conventions that will influence every later step: module boundaries, export surfaces, validation strategy, and test/build tooling.
-- The instruction files are currently untracked in git; implementation should avoid disturbing unrelated repository state.
+- Step 2 should not implement schema parsing or catalog building logic from later steps.
+- The config model should stay explicit and stable without locking the project into an unnecessarily large surface area.
+- The existing minimal config shape will need to evolve; tests and exports must be updated without weakening types.
 
-## 3. Architecture Decisions (Step 1 only)
+## 3. Architecture Decisions (Step 2 only)
 
-### Modules/files to introduce
+### Modules/files to introduce or update
 
-- `src/config/`
-  - User config types, validation scaffold, normalization scaffold, and public `defineConfig(...)` helper.
-- `src/schema/`
-  - Interfaces for schema file loading/parsing and placeholder result types.
-- `src/catalog/`
-  - Internal normalized metadata shapes that future steps will populate.
-- `src/generator/`
-  - Generator context/output interfaces and a placeholder entrypoint.
-- `src/runtime/`
-  - Runtime contract types and minimal helper placeholders used by generated code later.
-- `src/index.ts`
-  - Root public exports.
-- `tests/`
-  - Config validation tests, import smoke tests, and architecture-level sanity coverage.
+- `src/config/types.ts`
+  - Expand the public config types and normalized config types.
+- `src/config/schema.ts`
+  - Implement richer Zod validation, cross-reference validation, normalized path handling, and subject-name derivation.
+- `src/config/define-config.ts`
+  - Preserve `defineConfig(...)` as the ergonomic authoring helper and route `resolveConfig(...)` through the richer normalizer.
+- `tests/config.test.ts`
+  - Replace the scaffold-only tests with Step 2 coverage for valid and invalid configurations.
+- `tests/exports.test.ts`
+  - Keep a narrow public API smoke test aligned with the updated config contract.
 
 ### Responsibilities
 
-- Keep config validation isolated from schema and generation concerns.
-- Keep schema contracts independent from concrete Avro parsing until Step 3.
-- Keep catalog types focused on the internal canonical model, even if Step 1 only provides skeleton shapes.
-- Keep runtime contracts separate from generated output so future codegen can target stable runtime interfaces.
+- Public config types should be explicit and pleasant to author.
+- Validation should cover both structural issues and semantic issues such as duplicate event names.
+- Normalization should produce deterministic ordering plus derived metadata needed later, such as resolved schema paths and subject names.
 
 ### External libraries planned
 
-- `typescript`: compiler and typechecking.
-- `vitest`: unit/smoke testing with a lightweight TypeScript-friendly setup.
-- `zod`: explicit runtime validation for the config scaffold, with room for clear error messages and normalization in later steps.
-- `tsup`: simple library build pipeline for emitting distributable JavaScript and type declarations without overbuilding the toolchain.
-
-These choices are justified because they keep the setup small, established, and compatible with the project’s TypeScript-first goals.
+- Continue using `zod` for runtime validation because it already fits the project and gives precise field-level errors.
+- No new dependencies are needed for Step 2.
 
 ## 4. Task Breakdown
 
-- Task 1: initialize the package manifest, scripts, and dependency set for build, test, and typecheck.
-- Task 2: add base TypeScript and build configuration.
-- Task 3: create the top-level source folder structure and module entrypoints.
-- Task 4: implement the config scaffold with strong types, `defineConfig(...)`, and minimal runtime validation.
-- Task 5: add placeholder contracts/interfaces for schema, catalog, generator, and runtime modules.
-- Task 6: wire root exports to expose the intended public API surface for this step.
-- Task 7: add tests covering config validation basics and import/entrypoint smoke behavior.
-- Task 8: run tests and typecheck, then adjust any API or structure issues discovered.
+- Task 1: redesign the public config shape to cover output, sources, topics, events, runtime, schema registry, generation, and naming.
+- Task 2: implement Zod schemas and semantic validation for duplicate event names and invalid config states.
+- Task 3: implement deterministic normalized output, including resolved schema paths and derived subject names.
+- Task 4: update the exported config helpers/types to match the richer model.
+- Task 5: add Step 2 tests for valid single-event and multi-event configs, duplicate event rejection, missing schema paths, invalid strategies, and normalized output shape.
+- Task 6: run tests, typecheck, and build; fix issues until the step is stable.
 
 ## 5. File Changes Plan
 
-### New files expected
+### Existing files to modify
 
-- `package.json`
-- `tsconfig.json`
-- `tsconfig.build.json`
-- `vitest.config.ts`
-- `tsup.config.ts`
-- `src/index.ts`
-- `src/config/index.ts`
+- `codex.plan.md`
 - `src/config/types.ts`
 - `src/config/schema.ts`
 - `src/config/define-config.ts`
-- `src/schema/index.ts`
-- `src/schema/types.ts`
-- `src/catalog/index.ts`
-- `src/catalog/types.ts`
-- `src/generator/index.ts`
-- `src/generator/types.ts`
-- `src/runtime/index.ts`
-- `src/runtime/types.ts`
+- `src/config/index.ts`
 - `tests/config.test.ts`
 - `tests/exports.test.ts`
 
-### Existing files likely to modify
+### New files expected
 
-- `README.md`
-  - Only if a minimal usage/install note becomes necessary for clarity after the scaffold is in place.
+- None required for this step unless a small config utility file becomes necessary during implementation.
 
 ## 6. Testing Plan
 
-- Unit tests for config scaffold validation:
-  - accepts a minimal valid config shape
-  - rejects clearly invalid config input
-  - preserves the `defineConfig(...)` helper ergonomics
-- Smoke tests for architecture/public API:
-  - root entrypoint exports expected modules/functions
-  - placeholder subsystem contracts can be imported cleanly
-- Typecheck validation:
-  - run TypeScript compiler in no-emit mode to ensure the scaffold is strongly typed
-
-For Step 1, integration tests and generated-output tests are unnecessary because generation/runtime behavior is intentionally not implemented yet.
+- Unit tests for valid config authoring:
+  - valid single-event topic config
+  - valid multi-event topic config
+- Unit tests for validation failures:
+  - duplicate event names across topics
+  - missing schema path
+  - invalid subject strategy
+- Unit tests for normalization:
+  - deterministic topic/event ordering
+  - resolved schema path output
+  - derived subject names and event-to-topic mapping fields
+- Typecheck and build:
+  - `pnpm typecheck`
+  - `pnpm build`
 
 ## 7. Risks / Open Questions
 
-- The exact long-term config shape will evolve in Step 2; Step 1 should only introduce the minimal validated scaffold needed to support that future work.
-- `defineConfig(...)` is listed as a Step 2 deliverable, but Step 1 also requires a validated configuration scaffold. Assumption: introducing a minimal `defineConfig(...)` now is acceptable as a stable foundation, as long as the full user-facing config model is deferred to Step 2.
-- Runtime and generator placeholders must be explicit enough to establish architecture without implying functionality that does not yet exist.
-- `tsup` is a pragmatic build choice for now; if later steps need a different build strategy, the initial setup should remain easy to replace.
+- Duplicate topic detection is not meaningful if topics remain keyed by object name; the plan is to move topics/events to arrays so duplicates can be validated explicitly and metadata can grow cleanly.
+- Relative path resolution needs a clear base; assumption: `sources.rootDir` will default to `process.cwd()` during resolution and can be overridden explicitly.
+- Subject naming needs to be useful now without pre-committing to registry-specific edge cases. Assumption: support a small strategy enum now and allow per-event overrides.

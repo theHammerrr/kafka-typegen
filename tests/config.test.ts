@@ -1,3 +1,5 @@
+import { resolve as resolvePath } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -8,83 +10,104 @@ import {
   type KafkaTypegenConfig
 } from '../src/index.js';
 
-describe('config scaffold', () => {
-  it('accepts a minimal valid config', () => {
+describe('config validation', () => {
+  it('accepts a valid single-event topic config', () => {
     const config = defineConfig({
       outputDir: './generated',
-      topics: {
-        'user.events': {
-          events: {
-            'user.created': {
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
               schemaPath: './schemas/user-created.avsc'
             }
-          }
+          ],
+          name: 'user.events'
         }
-      }
+      ]
     } satisfies KafkaTypegenConfig);
 
-    const validatedConfig = validateConfig(config);
-
-    expect(validatedConfig).toEqual(config);
+    expect(validateConfig(config)).toEqual(config);
   });
 
-  it('normalizes topics and events deterministically', () => {
-    const normalized = resolveConfig({
+  it('accepts a valid multi-event topic config', () => {
+    const config = defineConfig({
       outputDir: './generated',
-      topics: {
-        'z.topic': {
-          events: {
-            'event.beta': {
-              schemaPath: './schemas/beta.avsc'
-            }
-          }
-        },
-        'a.topic': {
-          events: {
-            'event.gamma': {
-              schemaPath: './schemas/gamma.avsc'
+      schemaRegistry: {
+        subjectStrategy: 'topic-name',
+        url: 'http://localhost:8081'
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './schemas/user-created.avsc'
             },
-            'event.alpha': {
-              keySchemaPath: './schemas/alpha-key.avsc',
-              schemaPath: './schemas/alpha.avsc'
+            {
+              keySchemaPath: './schemas/user-updated-key.avsc',
+              name: 'user.updated',
+              schemaPath: './schemas/user-updated.avsc'
             }
-          }
+          ],
+          name: 'user.events'
         }
-      }
-    });
+      ]
+    } satisfies KafkaTypegenConfig);
 
-    expect(normalized.topics.map((topic) => topic.topicName)).toEqual(['a.topic', 'z.topic']);
-    expect(normalized.events.map((event) => event.eventName)).toEqual([
-      'event.alpha',
-      'event.gamma',
-      'event.beta'
-    ]);
-    expect(normalized.events[0]).toMatchObject({
-      keySchemaPath: './schemas/alpha-key.avsc',
-      topicName: 'a.topic'
-    });
+    expect(validateConfig(config)).toEqual(config);
   });
 
-  it('rejects invalid config input with actionable paths', () => {
+  it('rejects duplicate event names across topics', () => {
     expect(() =>
       validateConfig({
-        outputDir: '',
-        topics: {
-          'user.events': {
-            events: {}
+        outputDir: './generated',
+        topics: [
+          {
+            events: [
+              {
+                name: 'user.created',
+                schemaPath: './schemas/user-created.avsc'
+              }
+            ],
+            name: 'user.events'
+          },
+          {
+            events: [
+              {
+                name: 'user.created',
+                schemaPath: './schemas/audit-user-created.avsc'
+              }
+            ],
+            name: 'audit.events'
           }
-        }
+        ]
       })
     ).toThrowError(ConfigValidationError);
 
     try {
       validateConfig({
-        outputDir: '',
-        topics: {
-          'user.events': {
-            events: {}
+        outputDir: './generated',
+        topics: [
+          {
+            events: [
+              {
+                name: 'user.created',
+                schemaPath: './schemas/user-created.avsc'
+              }
+            ],
+            name: 'user.events'
+          },
+          {
+            events: [
+              {
+                name: 'user.created',
+                schemaPath: './schemas/audit-user-created.avsc'
+              }
+            ],
+            name: 'audit.events'
           }
-        }
+        ]
       });
     } catch (error) {
       expect(error).toBeInstanceOf(ConfigValidationError);
@@ -93,10 +116,170 @@ describe('config scaffold', () => {
 
       expect(validationError.issues).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ path: 'outputDir' }),
-          expect.objectContaining({ path: 'topics.user.events.events' })
+          expect.objectContaining({ path: 'topics[1].events[0].name' })
         ])
       );
     }
+  });
+
+  it('rejects missing schema paths', () => {
+    expect(() =>
+      validateConfig({
+        outputDir: './generated',
+        topics: [
+          {
+            events: [
+              {
+                name: 'user.created',
+                schemaPath: ''
+              }
+            ],
+            name: 'user.events'
+          }
+        ]
+      })
+    ).toThrowError(ConfigValidationError);
+  });
+
+  it('rejects invalid subject strategies with exact paths', () => {
+    expect(() =>
+      validateConfig({
+        outputDir: './generated',
+        schemaRegistry: {
+          subjectStrategy: 'invalid',
+          url: 'http://localhost:8081'
+        },
+        topics: [
+          {
+            events: [
+              {
+                name: 'user.created',
+                schemaPath: './schemas/user-created.avsc'
+              }
+            ],
+            name: 'user.events'
+          }
+        ]
+      })
+    ).toThrowError(ConfigValidationError);
+
+    try {
+      validateConfig({
+        outputDir: './generated',
+        schemaRegistry: {
+          subjectStrategy: 'invalid',
+          url: 'http://localhost:8081'
+        },
+        topics: [
+          {
+            events: [
+              {
+                name: 'user.created',
+                schemaPath: './schemas/user-created.avsc'
+              }
+            ],
+            name: 'user.events'
+          }
+        ]
+      });
+    } catch (error) {
+      const validationError = error as ConfigValidationError;
+
+      expect(validationError.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: 'schemaRegistry.subjectStrategy' })
+        ])
+      );
+    }
+  });
+});
+
+describe('config normalization', () => {
+  it('produces deterministic normalized output with derived metadata', () => {
+    const normalized = resolveConfig({
+      generation: {
+        clientName: 'AppClient',
+        typesFileName: 'types.ts'
+      },
+      naming: {
+        eventTypeSuffix: 'EventPayload',
+        topicTypeSuffix: 'Stream'
+      },
+      outputDir: './generated',
+      runtime: {
+        module: './runtime/custom',
+        transport: 'kafkajs'
+      },
+      schemaRegistry: {
+        subjectStrategy: 'topic-name',
+        url: 'http://localhost:8081'
+      },
+      sources: {
+        rootDir: './fixtures'
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.updated',
+              schemaPath: './schemas/user-updated.avsc'
+            }
+          ],
+          name: 'z.topic'
+        },
+        {
+          events: [
+            {
+              keySchemaPath: './schemas/user-created-key.avsc',
+              name: 'user.created',
+              schemaPath: './schemas/user-created.avsc',
+              subject: 'custom-user-created-subject'
+            },
+            {
+              name: 'user.deleted',
+              schemaPath: './schemas/user-deleted.avsc'
+            }
+          ],
+          keySchemaPath: './schemas/topic-key.avsc',
+          name: 'a.topic',
+          subjectStrategy: 'topic-event'
+        }
+      ]
+    });
+
+    expect(normalized.topics.map((topic) => topic.topicName)).toEqual(['a.topic', 'z.topic']);
+    expect(normalized.events.map((event) => event.eventName)).toEqual([
+      'user.created',
+      'user.deleted',
+      'user.updated'
+    ]);
+    expect(normalized.sources.rootDir).toBe(resolvePath('./fixtures'));
+    expect(normalized.resolvedOutputDir).toBe(resolvePath('./generated'));
+    expect(normalized.generation).toEqual({
+      clientName: 'AppClient',
+      typesFileName: 'types.ts'
+    });
+    expect(normalized.naming).toEqual({
+      eventTypeSuffix: 'EventPayload',
+      topicTypeSuffix: 'Stream'
+    });
+    expect(normalized.events[0]).toMatchObject({
+      eventName: 'user.created',
+      keySchemaPath: './schemas/user-created-key.avsc',
+      resolvedKeySchemaPath: resolvePath('./fixtures', './schemas/user-created-key.avsc'),
+      resolvedSchemaPath: resolvePath('./fixtures', './schemas/user-created.avsc'),
+      subjectName: 'custom-user-created-subject',
+      topicName: 'a.topic'
+    });
+    expect(normalized.events[1]).toMatchObject({
+      eventName: 'user.deleted',
+      keySchemaPath: './schemas/topic-key.avsc',
+      resolvedKeySchemaPath: resolvePath('./fixtures', './schemas/topic-key.avsc'),
+      subjectName: 'a.topic-user.deleted'
+    });
+    expect(normalized.events[2]).toMatchObject({
+      eventName: 'user.updated',
+      subjectName: 'z.topic'
+    });
   });
 });
