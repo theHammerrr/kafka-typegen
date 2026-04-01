@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createCatalogBuilder,
+  createTypeGenerator,
   defineConfig,
   resolveConfig,
   validateConfig,
@@ -15,6 +16,7 @@ import {
 describe('public entrypoint', () => {
   it('exposes the config helpers', () => {
     expect(createCatalogBuilder).toBeTypeOf('function');
+    expect(createTypeGenerator).toBeTypeOf('function');
     expect(defineConfig).toBeTypeOf('function');
     expect(resolveConfig).toBeTypeOf('function');
     expect(validateConfig).toBeTypeOf('function');
