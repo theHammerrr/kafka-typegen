@@ -21,6 +21,7 @@ type GeneratedConsumerModule = {
     ) => Promise<void>;
     onTopic: (
       topicName: string,
+      metadataByEvent: Readonly<Record<string, RuntimeEventMetadata>>,
       handler: (message: RuntimeConsumerMessage<unknown>) => Promise<void> | void
     ) => Promise<void>;
   }) => {
@@ -117,14 +118,18 @@ describe('generated consumer runtime', () => {
       ]
     });
 
-    const topicRegistrations: Array<{ handler: unknown; topicName: string }> = [];
+    const topicRegistrations: Array<{
+      handler: unknown;
+      metadataByEvent: Readonly<Record<string, RuntimeEventMetadata>>;
+      topicName: string;
+    }> = [];
     const eventRegistrations: Array<{ metadata: RuntimeEventMetadata; handler: unknown }> = [];
     const consumer = generatedModule.createConsumer({
       async on(metadata, handler) {
         eventRegistrations.push({ handler, metadata });
       },
-      async onTopic(topicName, handler) {
-        topicRegistrations.push({ handler, topicName });
+      async onTopic(topicName, metadataByEvent, handler) {
+        topicRegistrations.push({ handler, metadataByEvent, topicName });
       }
     });
 
@@ -139,6 +144,9 @@ describe('generated consumer runtime', () => {
     expect(topicRegistrations).toEqual([
       {
         handler: topicHandler,
+        metadataByEvent: {
+          'user.updated': generatedModule.producerEventMetadata['user.updated']
+        },
         topicName: 'user.lifecycle'
       }
     ]);
