@@ -12,6 +12,32 @@ export interface KafkaTypegenRuntimeConfig {
   readonly module?: string;
 }
 
+export interface KafkaTypegenSyncSaslConfig {
+  readonly mechanism: 'plain' | 'scram-sha-256' | 'scram-sha-512';
+  readonly password: string;
+  readonly username: string;
+}
+
+export interface KafkaTypegenSyncKafkaConfig {
+  readonly brokers: readonly string[];
+  readonly clientId?: string;
+  readonly failOnDrift?: boolean;
+  readonly sasl?: KafkaTypegenSyncSaslConfig;
+  readonly ssl?: boolean;
+}
+
+export interface KafkaTypegenSyncSchemaRegistryConfig {
+  readonly failOnDrift?: boolean;
+  readonly password?: string;
+  readonly url?: string;
+  readonly username?: string;
+}
+
+export interface KafkaTypegenSyncConfig {
+  readonly kafka?: KafkaTypegenSyncKafkaConfig;
+  readonly schemaRegistry?: KafkaTypegenSyncSchemaRegistryConfig;
+}
+
 export interface KafkaTypegenSourcesConfig {
   readonly rootDir?: string;
 }
@@ -38,12 +64,20 @@ export interface KafkaTypegenTopicConfig {
   readonly events: readonly KafkaTypegenEventConfig[];
   readonly keySchemaPath?: string;
   readonly subjectStrategy?: SubjectNameStrategy;
+  readonly sync?: KafkaTypegenTopicSyncConfig;
+}
+
+export interface KafkaTypegenTopicSyncConfig {
+  readonly configEntries?: Readonly<Record<string, string>>;
+  readonly partitions?: number;
+  readonly replicationFactor?: number;
 }
 
 export interface KafkaTypegenConfig {
   readonly outputDir: string;
   readonly schemaRegistry?: KafkaTypegenSchemaRegistryConfig;
   readonly runtime?: KafkaTypegenRuntimeConfig;
+  readonly sync?: KafkaTypegenSyncConfig;
   readonly sources?: KafkaTypegenSourcesConfig;
   readonly generation?: KafkaTypegenGenerationConfig;
   readonly naming?: KafkaTypegenNamingConfig;
@@ -58,6 +92,26 @@ export interface NormalizedSchemaRegistryConfig {
 export interface NormalizedRuntimeConfig {
   readonly transport: RuntimeTransport;
   readonly module: string;
+}
+
+export interface NormalizedSyncKafkaConfig {
+  readonly brokers: readonly string[];
+  readonly clientId: string;
+  readonly failOnDrift: boolean;
+  readonly sasl?: KafkaTypegenSyncSaslConfig;
+  readonly ssl: boolean;
+}
+
+export interface NormalizedSyncSchemaRegistryConfig {
+  readonly failOnDrift: boolean;
+  readonly password?: string;
+  readonly url: string;
+  readonly username?: string;
+}
+
+export interface NormalizedSyncConfig {
+  readonly kafka?: NormalizedSyncKafkaConfig;
+  readonly schemaRegistry?: NormalizedSyncSchemaRegistryConfig;
 }
 
 export interface NormalizedSourcesConfig {
@@ -89,7 +143,14 @@ export interface NormalizedTopicConfig {
   readonly keySchemaPath?: string;
   readonly resolvedKeySchemaPath?: string;
   readonly subjectStrategy: SubjectNameStrategy;
+  readonly sync: NormalizedTopicSyncConfig;
   readonly events: readonly NormalizedEventConfig[];
+}
+
+export interface NormalizedTopicSyncConfig {
+  readonly configEntries: Readonly<Record<string, string>>;
+  readonly partitions: number;
+  readonly replicationFactor: number;
 }
 
 export interface NormalizedKafkaTypegenConfig {
@@ -97,6 +158,7 @@ export interface NormalizedKafkaTypegenConfig {
   readonly resolvedOutputDir: string;
   readonly schemaRegistry?: NormalizedSchemaRegistryConfig;
   readonly runtime: NormalizedRuntimeConfig;
+  readonly sync?: NormalizedSyncConfig;
   readonly sources: NormalizedSourcesConfig;
   readonly generation: NormalizedGenerationConfig;
   readonly naming: NormalizedNamingConfig;

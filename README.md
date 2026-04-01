@@ -146,6 +146,18 @@ pnpm kafka-typegen --config ./kafka-typegen.config.mjs
 
 The generated file is written to `outputDir`. By default the filename is `kafka-client.ts`.
 
+### 4. Plan or apply infrastructure sync
+
+`kafka-typegen` can now plan or apply Kafka topic creation and Schema Registry subject creation from the same config:
+
+```bash
+pnpm kafka-typegen sync
+pnpm kafka-typegen sync --apply
+pnpm kafka-typegen sync --target kafka
+```
+
+The default `sync` mode is a dry-run. It reports what will be created and any detected drift for existing resources.
+
 ## Config Reference
 
 The config is intentionally explicit. Important fields:
@@ -164,6 +176,25 @@ interface KafkaTypegenConfig {
     transport?: 'kafkajs' | '@platformatic/kafka';
     module?: string;
   };
+  sync?: {
+    kafka?: {
+      brokers: string[];
+      clientId?: string;
+      ssl?: boolean;
+      sasl?: {
+        mechanism: 'plain' | 'scram-sha-256' | 'scram-sha-512';
+        username: string;
+        password: string;
+      };
+      failOnDrift?: boolean;
+    };
+    schemaRegistry?: {
+      url?: string;
+      username?: string;
+      password?: string;
+      failOnDrift?: boolean;
+    };
+  };
   generation?: {
     clientName?: string;
     typesFileName?: string;
@@ -176,6 +207,11 @@ interface KafkaTypegenConfig {
     name: string;
     keySchemaPath?: string;
     subjectStrategy?: 'event-name' | 'topic-name' | 'topic-event';
+    sync?: {
+      partitions?: number;
+      replicationFactor?: number;
+      configEntries?: Record<string, string>;
+    };
     events: Array<{
       name: string;
       schemaPath: string;
@@ -195,6 +231,53 @@ interface KafkaTypegenConfig {
 - If `runtime.module` is omitted:
   - `kafkajs` defaults to `kafka-typegen/runtime`
   - `@platformatic/kafka` defaults to `kafka-typegen/runtime/platformatic`
+- `sync.kafka` config is used only by the `sync` CLI command.
+- `sync.schemaRegistry.url` defaults to `schemaRegistry.url` when omitted.
+- Topic sync defaults are `partitions: 1`, `replicationFactor: 1`, and empty `configEntries`.
+
+### Sync Config Example
+
+```js
+import { defineConfig } from 'kafka-typegen';
+
+export default defineConfig({
+  outputDir: './generated',
+  schemaRegistry: {
+    url: process.env.SCHEMA_REGISTRY_URL
+  },
+  sync: {
+    kafka: {
+      brokers: [process.env.KAFKA_BROKER ?? 'localhost:9092'],
+      clientId: 'kafka-typegen-sync'
+    },
+    schemaRegistry: {
+      username: process.env.SCHEMA_REGISTRY_USERNAME,
+      password: process.env.SCHEMA_REGISTRY_PASSWORD
+    }
+  },
+  sources: {
+    rootDir: './schemas'
+  },
+  topics: [
+    {
+      name: 'user.events',
+      sync: {
+        partitions: 3,
+        replicationFactor: 2,
+        configEntries: {
+          'cleanup.policy': 'delete'
+        }
+      },
+      events: [
+        {
+          name: 'user.created',
+          schemaPath: './user-created.avsc'
+        }
+      ]
+    }
+  ]
+});
+```
 
 ## Runtime Usage
 
@@ -284,6 +367,19 @@ Supported behavior:
 - explicit config loading via `--config <path>`
 - generation output written to the configured `outputDir`
 - actionable validation and loading errors
+- `sync` command with dry-run by default
+- `sync --apply` to create missing Kafka topics and Schema Registry subjects
+- `sync --target kafka|registry|all`
+- `sync --json` for machine-readable sync output
+
+Examples:
+
+```bash
+kafka-typegen
+kafka-typegen generate --config ./kafka-typegen.config.mjs
+kafka-typegen sync --config ./kafka-typegen.config.mjs
+kafka-typegen sync --apply --target registry
+```
 
 ## Package Exports
 
@@ -318,13 +414,16 @@ What this package does today:
 - generates typed producer, consumer, and client APIs
 - supports a generic runtime abstraction
 - ships a first-party `@platformatic/kafka` runtime adapter
+- can plan or create Kafka topics through the `sync` command
+- can plan or create Schema Registry subjects through the `sync` command
 
 What it does not do automatically:
 
-- create Kafka topics
 - manage runtime client lifecycle for you
 - own schema-registry serialization logic out of the box
 - generate multiple output files per config
+- mutate existing Kafka topics to reconcile drift
+- mutate existing Schema Registry subjects when schemas differ
 
 ## Status
 

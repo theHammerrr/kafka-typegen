@@ -11,6 +11,7 @@ import type {
 } from './types.js';
 import { getRuntimeModule } from './runtime-module.js';
 import { deriveSubjectName } from './subject-name.js';
+import { normalizeSyncConfig } from './sync-normalize.js';
 
 function normalizeEvent(
   event: KafkaTypegenEventConfig,
@@ -46,6 +47,11 @@ function normalizeTopic(
 
   return {
     events,
+    sync: {
+      configEntries: topic.sync?.configEntries ?? {},
+      partitions: topic.sync?.partitions ?? 1,
+      replicationFactor: topic.sync?.replicationFactor ?? 1
+    },
     topicName: topic.name,
     subjectStrategy,
     ...(topicKeySchemaPath !== undefined ? { keySchemaPath: topicKeySchemaPath } : {}),
@@ -57,6 +63,7 @@ export function normalizeConfig(config: KafkaTypegenConfig): NormalizedKafkaType
   const sourceRoot = resolvePath(config.sources?.rootDir ?? process.cwd());
   const defaultSubjectStrategy = config.schemaRegistry?.subjectStrategy ?? 'topic-event';
   const normalizedTransport = config.runtime?.transport ?? 'kafkajs';
+  const normalizedSyncConfig = normalizeSyncConfig(config);
   const topics = [...config.topics]
     .sort((leftTopic, rightTopic) => leftTopic.name.localeCompare(rightTopic.name))
     .map((topic) => normalizeTopic(topic, sourceRoot, defaultSubjectStrategy));
@@ -76,6 +83,9 @@ export function normalizeConfig(config: KafkaTypegenConfig): NormalizedKafkaType
     runtime: { module: getRuntimeModule(normalizedTransport, config.runtime?.module), transport: normalizedTransport },
     sources: { rootDir: sourceRoot },
     topics,
+    ...(normalizedSyncConfig !== undefined && Object.keys(normalizedSyncConfig).length > 0
+      ? { sync: normalizedSyncConfig }
+      : {}),
     ...(config.schemaRegistry !== undefined
       ? { schemaRegistry: { subjectStrategy: defaultSubjectStrategy, url: config.schemaRegistry.url } }
       : {})

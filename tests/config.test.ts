@@ -80,6 +80,40 @@ describe('config validation', () => {
     expect(validateConfig(config)).toEqual(config);
   });
 
+  it('accepts sync configuration for kafka topics and schema registry', () => {
+    const config = defineConfig({
+      outputDir: './generated',
+      schemaRegistry: {
+        url: 'http://localhost:8081'
+      },
+      sync: {
+        kafka: {
+          brokers: ['localhost:9092']
+        },
+        schemaRegistry: {
+          failOnDrift: true
+        }
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './schemas/user-created.avsc'
+            }
+          ],
+          name: 'user.events',
+          sync: {
+            partitions: 3,
+            replicationFactor: 2
+          }
+        }
+      ]
+    } satisfies KafkaTypegenConfig);
+
+    expect(validateConfig(config)).toEqual(config);
+  });
+
   it('rejects duplicate event names across topics', () => {
     expect(() =>
       validateConfig({
@@ -369,6 +403,49 @@ describe('config normalization', () => {
     expect(overriddenPlatformaticConfig.runtime).toEqual({
       module: './runtime/custom-platformatic',
       transport: '@platformatic/kafka'
+    });
+  });
+
+  it('normalizes sync defaults and inherits schema registry url for sync', () => {
+    const normalized = resolveConfig({
+      outputDir: './generated',
+      schemaRegistry: {
+        url: 'http://localhost:8081'
+      },
+      sync: {
+        kafka: {
+          brokers: ['localhost:9092']
+        }
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './schemas/user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+
+    expect(normalized.sync).toEqual({
+      kafka: {
+        brokers: ['localhost:9092'],
+        clientId: 'kafka-typegen-sync',
+        failOnDrift: false,
+        ssl: false
+      },
+      schemaRegistry: {
+        failOnDrift: false,
+        url: 'http://localhost:8081'
+      }
+    });
+    expect(normalized.topics[0]?.sync).toEqual({
+      configEntries: {},
+      partitions: 1,
+      replicationFactor: 1
     });
   });
 });

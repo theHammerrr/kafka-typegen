@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { runCli } from '../src/cli.js';
+import { runCli, type CliDependencies } from '../src/cli.js';
 
 const cliFixturePath = join('tests', 'fixtures', 'cli', 'kafka-typegen.config.mjs');
 const schemaFixturesDir = join('tests', 'fixtures', 'schemas');
@@ -33,7 +33,8 @@ async function createWorkspaceFromFixture(configContents?: string): Promise<stri
 
 async function runCliCapture(
   args: readonly string[],
-  cwd: string
+  cwd: string,
+  dependencies: CliDependencies = {}
 ): Promise<{ code: number; stderr: string; stdout: string }> {
   const originalCwd = process.cwd();
   const originalStdoutWrite = process.stdout.write.bind(process.stdout);
@@ -52,7 +53,7 @@ async function runCliCapture(
   }) as typeof process.stderr.write;
 
   try {
-    const code = await runCli(args);
+    const code = await runCli(args, dependencies);
 
     return { code, stderr, stdout };
   } finally {
@@ -128,5 +129,82 @@ describe('cli', () => {
 
     expect(result.code).toBe(0);
     expect(generatedFile).toContain('UserCreatedPayload');
+  });
+
+  it('runs sync in dry-run mode by default', async () => {
+    const workspace = await createWorkspaceFromFixture(`
+      export default {
+        outputDir: './generated',
+        schemaRegistry: { url: 'http://localhost:8081' },
+        sync: { kafka: { brokers: ['localhost:9092'] } },
+        sources: { rootDir: './schemas' },
+        topics: [
+          {
+            name: 'user.events',
+            sync: { partitions: 2 },
+            events: [{ name: 'user.created', schemaPath: './user-created.avsc' }]
+          }
+        ]
+      };
+    `);
+
+    const result = await runCliCapture(['sync'], workspace, {
+      createSyncClients() {
+        return {
+          kafkaAdmin: {
+            async createTopics() {},
+            async listTopics() {
+              return [];
+            }
+          },
+          schemaRegistry: {
+            async getLatestSubject() {
+              return undefined;
+            },
+            async registerSubject() {}
+          }
+        };
+      }
+    });
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('Planned 2 sync operation(s).');
+    expect(result.stdout).toContain('[kafka] CREATE user.events');
+    expect(result.stdout).toContain('[registry] CREATE user.events-user.created');
+  });
+
+  it('supports sync json output', async () => {
+    const workspace = await createWorkspaceFromFixture(`
+      export default {
+        outputDir: './generated',
+        sync: { kafka: { brokers: ['localhost:9092'] } },
+        sources: { rootDir: './schemas' },
+        topics: [
+          {
+            name: 'user.events',
+            events: [{ name: 'user.created', schemaPath: './user-created.avsc' }]
+          }
+        ]
+      };
+    `);
+
+    const result = await runCliCapture(['sync', '--target', 'kafka', '--json'], workspace, {
+      createSyncClients() {
+        return {
+          kafkaAdmin: {
+            async createTopics() {},
+            async listTopics() {
+              return [];
+            }
+          }
+        };
+      }
+    });
+
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      applied: false,
+      operations: [expect.objectContaining({ action: 'create', target: 'kafka' })]
+    });
   });
 });

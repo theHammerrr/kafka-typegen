@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createCatalogBuilder, createTypeGenerator, resolveConfig } from '../src/index.js';
+import { buildKafkaTopicPlan, buildSchemaRegistryPlan, createCatalogBuilder, createTypeGenerator, resolveConfig } from '../src/index.js';
 
 const schemaFixturesDir = join('tests', 'fixtures', 'schemas');
 const tempDirs: string[] = [];
@@ -156,5 +156,53 @@ describe('end-to-end generation', () => {
         ]
       })
     ).rejects.toThrowError("Failed to load schema file");
+  });
+
+  it('builds a coherent sync plan from config through catalog construction', async () => {
+    const workspace = await createTempWorkspace();
+    const originalCwd = process.cwd();
+
+    process.chdir(workspace);
+
+    try {
+      const config = resolveConfig({
+        outputDir: './generated',
+        schemaRegistry: {
+          url: 'http://localhost:8081'
+        },
+        sync: {
+          kafka: {
+            brokers: ['localhost:9092']
+          }
+        },
+        sources: {
+          rootDir: './schemas'
+        },
+        topics: [
+          {
+            events: [
+              {
+                name: 'user.created',
+                schemaPath: './user-created.avsc'
+              }
+            ],
+            name: 'user.events',
+            sync: {
+              partitions: 2
+            }
+          }
+        ]
+      });
+      const catalog = await createCatalogBuilder().build(config);
+
+      expect(buildKafkaTopicPlan(catalog)).toEqual([
+        expect.objectContaining({ partitions: 2, topicName: 'user.events' })
+      ]);
+      expect(buildSchemaRegistryPlan(catalog)).toEqual([
+        expect.objectContaining({ subjectName: 'user.events-user.created' })
+      ]);
+    } finally {
+      process.chdir(originalCwd);
+    }
   });
 });
