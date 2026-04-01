@@ -2,101 +2,105 @@
 
 ## 1. Current Step
 
-- Step 2: Configuration Model and Validation.
-- This is the correct next step because Step 1 established the project structure, public entrypoints, and a minimal config scaffold. The next missing capability is the real user-facing configuration contract that later schema loading, catalog building, and generation steps will depend on.
+- Step 3: Avro Schema Loading and Parsing.
+- This is the correct next step because Step 2 now produces a normalized config with resolved schema paths for events. The next dependency for generation is the ability to load those schema files, parse them safely, and normalize their metadata into a generator-friendly shape.
 
 ## 2. Repository Assessment
 
 ### What already exists
 
-- TypeScript build/test setup with `tsup`, `vitest`, and strict compiler settings.
-- Public module boundaries for `config`, `schema`, `catalog`, `generator`, and `runtime`.
-- A small config scaffold with `defineConfig(...)`, validation, normalization, and basic tests.
+- Strict TypeScript build/test setup and verified Step 1/2 branches.
+- A normalized config model with resolved event schema paths and deterministic ordering.
+- Placeholder schema interfaces in `src/schema/types.ts` and exports in `src/schema/index.ts`.
 
 ### What is missing
 
-- Full config model for topics, events, generation, naming, schema registry, runtime options, and source-root handling.
-- Validation for duplicate event names across topics.
-- Validation for invalid subject strategy / naming values.
-- Normalized config output rich enough to support later steps.
-- Tests covering single-event and multi-event topic scenarios under the fuller config shape.
+- Concrete schema file loader implementation.
+- Concrete Avro parser integration.
+- Normalized schema metadata rich enough for later catalog and generation steps.
+- Schema-specific error types for missing files and malformed/unsupported schemas.
+- Tests and fixtures covering load/parse success and failure cases.
 
 ### Constraints and risks
 
-- Step 2 should not implement schema parsing or catalog building logic from later steps.
-- The config model should stay explicit and stable without locking the project into an unnecessarily large surface area.
-- The existing minimal config shape will need to evolve; tests and exports must be updated without weakening types.
+- Step 3 must keep loading separate from parsing.
+- Scope should stay on event value schemas; key schemas and references only need future-safe contracts, not full support.
+- Top-level schema support should be intentionally limited to Avro records with clear failure messages for unsupported roots.
 
-## 3. Architecture Decisions (Step 2 only)
+## 3. Architecture Decisions (Step 3 only)
 
 ### Modules/files to introduce or update
 
-- `src/config/types.ts`
-  - Expand the public config types and normalized config types.
-- `src/config/schema.ts`
-  - Implement richer Zod validation, cross-reference validation, normalized path handling, and subject-name derivation.
-- `src/config/define-config.ts`
-  - Preserve `defineConfig(...)` as the ergonomic authoring helper and route `resolveConfig(...)` through the richer normalizer.
-- `tests/config.test.ts`
-  - Replace the scaffold-only tests with Step 2 coverage for valid and invalid configurations.
-- `tests/exports.test.ts`
-  - Keep a narrow public API smoke test aligned with the updated config contract.
+- `src/schema/types.ts`
+  - Expand the schema contracts to include field metadata, schema collection results, and structured errors.
+- `src/schema/errors.ts`
+  - Define focused error classes for load and parse failures.
+- `src/schema/loader.ts`
+  - Filesystem-backed schema loader that reads UTF-8 schema files.
+- `src/schema/parser.ts`
+  - Avro parser integration plus normalization into record/field metadata.
+- `src/schema/index.ts`
+  - Export the new contracts and concrete helpers.
+- `tests/schema.test.ts`
+  - Step 3 behavioral tests.
+- `tests/fixtures/schemas/`
+  - Valid and invalid schema fixtures.
 
 ### Responsibilities
 
-- Public config types should be explicit and pleasant to author.
-- Validation should cover both structural issues and semantic issues such as duplicate event names.
-- Normalization should produce deterministic ordering plus derived metadata needed later, such as resolved schema paths and subject names.
+- Loader: resolve file reading concerns and surface actionable file-path errors.
+- Parser: validate Avro shape, enforce top-level record support, and normalize field metadata.
+- Schema module facade: provide a simple entrypoint for loading one schema or many schemas from normalized event config.
 
 ### External libraries planned
 
-- Continue using `zod` for runtime validation because it already fits the project and gives precise field-level errors.
-- No new dependencies are needed for Step 2.
+- `avsc`: mature Avro library for parsing/validating schema definitions instead of handwritten parsing logic.
 
 ## 4. Task Breakdown
 
-- Task 1: redesign the public config shape to cover output, sources, topics, events, runtime, schema registry, generation, and naming.
-- Task 2: implement Zod schemas and semantic validation for duplicate event names and invalid config states.
-- Task 3: implement deterministic normalized output, including resolved schema paths and derived subject names.
-- Task 4: update the exported config helpers/types to match the richer model.
-- Task 5: add Step 2 tests for valid single-event and multi-event configs, duplicate event rejection, missing schema paths, invalid strategies, and normalized output shape.
-- Task 6: run tests, typecheck, and build; fix issues until the step is stable.
+- Task 1: add the Avro dependency and extend schema types/contracts.
+- Task 2: implement schema loader error handling and UTF-8 file loading.
+- Task 3: implement Avro parsing and normalized record metadata extraction.
+- Task 4: add helper flow(s) for loading/parsing one schema and multiple event schemas.
+- Task 5: add fixture-backed tests for valid load, malformed schema, missing file, normalized metadata extraction, and multiple-schema loading.
+- Task 6: run tests, typecheck, and build until the step is stable.
 
 ## 5. File Changes Plan
 
 ### Existing files to modify
 
 - `codex.plan.md`
-- `src/config/types.ts`
-- `src/config/schema.ts`
-- `src/config/define-config.ts`
-- `src/config/index.ts`
-- `tests/config.test.ts`
-- `tests/exports.test.ts`
+- `package.json`
+- `pnpm-lock.yaml`
+- `src/schema/types.ts`
+- `src/schema/index.ts`
 
 ### New files expected
 
-- None required for this step unless a small config utility file becomes necessary during implementation.
+- `src/schema/errors.ts`
+- `src/schema/loader.ts`
+- `src/schema/parser.ts`
+- `tests/schema.test.ts`
+- `tests/fixtures/schemas/user-created.avsc`
+- `tests/fixtures/schemas/user-updated.avsc`
+- `tests/fixtures/schemas/invalid-json.avsc`
+- `tests/fixtures/schemas/invalid-root.avsc`
 
 ## 6. Testing Plan
 
-- Unit tests for valid config authoring:
-  - valid single-event topic config
-  - valid multi-event topic config
-- Unit tests for validation failures:
-  - duplicate event names across topics
-  - missing schema path
-  - invalid subject strategy
-- Unit tests for normalization:
-  - deterministic topic/event ordering
-  - resolved schema path output
-  - derived subject names and event-to-topic mapping fields
-- Typecheck and build:
+- Unit/integration-style schema tests:
+  - successful load of a valid schema file
+  - malformed schema handling
+  - missing file handling
+  - normalized metadata extraction for record name, namespace, and fields
+  - multiple schemas across multiple topics using normalized Step 2 config
+- Verification:
+  - `pnpm test`
   - `pnpm typecheck`
   - `pnpm build`
 
 ## 7. Risks / Open Questions
 
-- Duplicate topic detection is not meaningful if topics remain keyed by object name; the plan is to move topics/events to arrays so duplicates can be validated explicitly and metadata can grow cleanly.
-- Relative path resolution needs a clear base; assumption: `sources.rootDir` will default to `process.cwd()` during resolution and can be overridden explicitly.
-- Subject naming needs to be useful now without pre-committing to registry-specific edge cases. Assumption: support a small strategy enum now and allow per-event overrides.
+- `avsc` error messages can be low-level; I will wrap them in project-specific errors while preserving the root cause text.
+- Field type normalization needs to stay useful without solving every Avro edge case; assumption: a readable string summary plus the raw field type is enough for Step 3.
+- Reference/import support is intentionally deferred, but the parser contracts should not prevent adding it later.

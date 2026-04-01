@@ -24,6 +24,7 @@ describe('public entrypoint', () => {
     const schemaLoader: SchemaLoader = {
       async load(source) {
         return {
+          filePath: source.filePath,
           rawSchema: '{}',
           source
         };

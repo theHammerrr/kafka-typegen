@@ -1,0 +1,25 @@
+{
+  "type": "record",
+  "name": "UserUpdated",
+  "namespace": "com.example.users",
+  "fields": [
+    {
+      "name": "id",
+      "type": "string"
+    },
+    {
+      "name": "displayName",
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    {
+      "name": "metadata",
+      "type": {
+        "type": "map",
+        "values": "string"
+      }
+    }
+  ]
+}
