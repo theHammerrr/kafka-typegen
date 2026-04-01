@@ -1,0 +1,43 @@
+import type { ConfigValidationIssue, KafkaTypegenConfig } from './types.js';
+import { ConfigValidationError } from './types.js';
+import { buildValidationIssue } from './issues.js';
+
+export function validateSemanticConfig(config: KafkaTypegenConfig): void {
+  const issues: ConfigValidationIssue[] = [];
+  const topicNameIndexes = new Map<string, number>();
+  const eventNameIndexes = new Map<string, { topicIndex: number; eventIndex: number }>();
+
+  config.topics.forEach((topic, topicIndex) => {
+    const existingTopicIndex = topicNameIndexes.get(topic.name);
+
+    if (existingTopicIndex !== undefined) {
+      issues.push(
+        buildValidationIssue(
+          ['topics', topicIndex, 'name'],
+          `Duplicate topic name '${topic.name}'. First defined at topics[${existingTopicIndex}].name.`
+        )
+      );
+    } else {
+      topicNameIndexes.set(topic.name, topicIndex);
+    }
+
+    topic.events.forEach((event, eventIndex) => {
+      const existingEvent = eventNameIndexes.get(event.name);
+
+      if (existingEvent !== undefined) {
+        issues.push(
+          buildValidationIssue(
+            ['topics', topicIndex, 'events', eventIndex, 'name'],
+            `Duplicate event name '${event.name}'. First defined at topics[${existingEvent.topicIndex}].events[${existingEvent.eventIndex}].name.`
+          )
+        );
+      } else {
+        eventNameIndexes.set(event.name, { eventIndex, topicIndex });
+      }
+    });
+  });
+
+  if (issues.length > 0) {
+    throw new ConfigValidationError(issues);
+  }
+}

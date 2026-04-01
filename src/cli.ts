@@ -1,82 +1,13 @@
 #!/usr/bin/env node
 
-import { mkdir, writeFile } from 'node:fs/promises';
-import { access } from 'node:fs/promises';
-import { constants as fsConstants } from 'node:fs';
-import { pathToFileURL } from 'node:url';
-import { dirname, resolve as resolvePath } from 'node:path';
+import { dirname } from 'node:path';
 
 import { createCatalogBuilder } from './catalog/index.js';
+import { loadUserConfig, resolveConfigFilePath } from './cli/config-file.js';
+import { isDirectCliExecution, parseArgs } from './cli/args.js';
+import { writeGeneratedFiles } from './cli/write-output.js';
 import { resolveConfig } from './config/index.js';
 import { createTypeGenerator } from './generator/index.js';
-
-const DEFAULT_CONFIG_FILE = 'kafka-typegen.config.mjs';
-
-interface CliOptions {
-  readonly configPath?: string;
-}
-
-function isDirectCliExecution(argv: readonly string[]): boolean {
-  const entrypoint = argv[1];
-
-  return typeof entrypoint === 'string' && /(?:^|[\\/])cli(?:\.[cm]?js)?$/u.test(entrypoint);
-}
-
-function parseArgs(argv: readonly string[]): CliOptions {
-  let configPath: string | undefined;
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const argument = argv[index];
-
-    if (argument === '--config') {
-      const candidatePath = argv[index + 1];
-
-      if (candidatePath === undefined || candidatePath.startsWith('--')) {
-        throw new Error("The '--config' flag requires a file path.");
-      }
-
-      configPath = candidatePath;
-      index += 1;
-      continue;
-    }
-
-    throw new Error(`Unknown CLI argument '${argument}'.`);
-  }
-
-  return configPath !== undefined ? { configPath } : {};
-}
-
-async function resolveConfigFilePath(options: CliOptions): Promise<string> {
-  const candidatePath = options.configPath ?? DEFAULT_CONFIG_FILE;
-  const resolvedPath = resolvePath(candidatePath);
-
-  await access(resolvedPath, fsConstants.F_OK);
-
-  return resolvedPath;
-}
-
-async function loadUserConfig(configFilePath: string): Promise<unknown> {
-  const importedModule = await import(pathToFileURL(configFilePath).href);
-
-  if ('default' in importedModule) {
-    return importedModule.default;
-  }
-
-  throw new Error(`Config file '${configFilePath}' must export a default config object.`);
-}
-
-async function writeGeneratedFiles(outputDir: string, files: readonly { filePath: string; contents: string }[]) {
-  await mkdir(outputDir, { recursive: true });
-
-  await Promise.all(
-    files.map(async (file) => {
-      const targetPath = resolvePath(outputDir, file.filePath);
-
-      await mkdir(dirname(targetPath), { recursive: true });
-      await writeFile(targetPath, file.contents, 'utf8');
-    })
-  );
-}
 
 export async function runCli(argv: readonly string[] = process.argv.slice(2)): Promise<number> {
   const originalCwd = process.cwd();
@@ -84,9 +15,7 @@ export async function runCli(argv: readonly string[] = process.argv.slice(2)): P
   try {
     const options = parseArgs(argv);
     const configFilePath = await resolveConfigFilePath(options);
-    const configDirectory = dirname(configFilePath);
-
-    process.chdir(configDirectory);
+    process.chdir(dirname(configFilePath));
 
     const userConfig = await loadUserConfig(configFilePath);
     const normalizedConfig = resolveConfig(userConfig);
@@ -94,17 +23,11 @@ export async function runCli(argv: readonly string[] = process.argv.slice(2)): P
     const output = await createTypeGenerator().generate(catalog);
 
     await writeGeneratedFiles(normalizedConfig.resolvedOutputDir, output.files);
-
-    process.stdout.write(
-      `Generated ${output.files.length} file(s) into '${normalizedConfig.resolvedOutputDir}' using '${configFilePath}'.\n`
-    );
-
+    process.stdout.write(`Generated ${output.files.length} file(s) into '${normalizedConfig.resolvedOutputDir}' using '${configFilePath}'.\n`);
     return 0;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown CLI error.';
-
     process.stderr.write(`${message}\n`);
-
     return 1;
   } finally {
     process.chdir(originalCwd);
