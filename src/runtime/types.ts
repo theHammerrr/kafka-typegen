@@ -1,6 +1,9 @@
 export interface RuntimeEventMetadata {
   readonly eventName: string;
-  readonly schemaPath: string;
+  readonly payloadTypeName: string;
+  readonly schemaFilePath: string;
+  readonly schemaName: string;
+  readonly subjectName: string;
   readonly topicName: string;
 }
 
