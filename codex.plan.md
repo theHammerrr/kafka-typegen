@@ -2,63 +2,61 @@
 
 ## 1. Current Step
 
-- Step 7: Generated Consumer API.
-- This is the correct next step because Step 6 already emits the producer-facing generated client and runtime metadata constants. The next missing capability is the consumer-facing API that uses the same generated metadata and payload typings.
+- Step 9: CLI / Generator Entry Point.
+- This is the correct next step because the generator pipeline now exists end-to-end in-process, but users still cannot invoke it through a standard command that loads config, runs generation, writes output, and reports failures.
 
 ## 2. Repository Assessment
 
 ### What already exists
 
-- Canonical catalog with event and topic metadata.
-- Generated payload types, metadata maps, and producer API.
-- Minimal runtime consumer contract.
+- Config normalization and validation.
+- Schema loading/parsing, canonical catalog building, type generation, and runtime integration.
+- Tests covering the internal pipeline.
 
 ### What is missing
 
-- Event-first generated consumer API.
-- Topic-based generated consumer API with discriminated unions.
-- Typed decoded message shapes carrying useful metadata.
-- Tests proving the generated API shape and runtime metadata routing.
+- CLI executable entrypoint.
+- Config discovery/loading from a user config file.
+- File writing step for generated output.
+- CLI-facing error handling and output messages.
+- CLI integration tests.
 
 ### Constraints and risks
 
-- Step 7 should not implement transport deserialization logic yet.
-- The generated consumer API should stay readable and align with the producer style from Step 6.
-- Topic-based unions should be useful without overcomplicating the first version.
+- Step 9 should stay focused on generation, not on expanding runtime capabilities further.
+- The CLI should be predictable and explicit; config discovery can exist, but it should not depend only on magic.
+- The config loader must support a simple authoring format without introducing a heavy bundling dependency.
 
-## 3. Architecture Decisions (Step 7 only)
+## 3. Architecture Decisions (Step 9 only)
 
 ### Modules/files to introduce or update
 
-- `src/runtime/types.ts`
-  - Expand the runtime consumer message shape to include useful metadata fields and align naming with generated code.
-- `src/runtime/index.ts`
-  - Re-export the updated runtime consumer types.
-- `src/generator/type-generator.ts`
-  - Extend the generated file with consumer message types and consumer factory/types.
-- `tests/generator.test.ts`
-  - Update golden-output expectations for the generated consumer API.
-- `tests/runtime-consumer.test.ts`
-  - Add execution tests covering event-first and topic-based consumer registration.
-- `tests/fixtures/generated/`
-  - Refresh expected generated output fixtures.
+- `package.json`
+  - Add a `bin` entry and CLI-friendly scripts if needed.
+- `src/cli.ts`
+  - Implement the command entrypoint, argument parsing, config discovery/loading, pipeline execution, and file writes.
+- `src/index.ts`
+  - Export CLI-adjacent helpers only if needed; otherwise keep CLI private.
+- `tests/cli.test.ts`
+  - Add CLI integration tests for config loading, generation execution, invalid config, and output paths.
+- `tests/fixtures/cli/`
+  - Add a sample config file and isolated output workspace fixtures.
 
 ### Responsibilities
 
-- Runtime types: define the narrow generated/runtime handshake for consumer handlers.
-- Generator: emit event-first `on(event, handler)` plus topic-based `onTopic(topic, handler)` APIs and typed message shapes.
-- Runtime tests: verify metadata routing and handler registration against a mocked runtime consumer.
+- CLI: parse `--config`, support default config discovery, run the existing pipeline, write generated files to `outputDir`, and print actionable errors.
+- Tests: spawn the CLI in a temp workspace and verify written output and failure behavior.
 
 ### External libraries planned
 
-- No new dependencies are required.
+- No new dependency by default. The CLI can use built-in Node APIs plus dynamic module import for a JavaScript config file.
 
 ## 4. Task Breakdown
 
-- Task 1: extend runtime consumer metadata/message contracts for generated handlers.
-- Task 2: extend the generated file with consumer message types and factory APIs.
-- Task 3: update golden fixtures for single-event and multi-event consumer-aware output.
-- Task 4: add runtime execution tests for event-first and topic-based consumer registration.
+- Task 1: define the CLI invocation shape and config discovery behavior.
+- Task 2: implement config file loading and pipeline execution.
+- Task 3: implement generated file writes and helpful CLI output/errors.
+- Task 4: add CLI integration tests for explicit config loading, default discovery, invalid config failure, and output path handling.
 - Task 5: run tests, typecheck, and build until the step is stable.
 
 ## 5. File Changes Plan
@@ -66,24 +64,21 @@
 ### Existing files to modify
 
 - `codex.plan.md`
-- `src/runtime/types.ts`
-- `src/runtime/index.ts`
-- `src/generator/type-generator.ts`
-- `tests/generator.test.ts`
-- `tests/fixtures/generated/single-event.ts`
-- `tests/fixtures/generated/multi-event.ts`
-- `tests/exports.test.ts`
+- `package.json`
 
 ### New files expected
 
-- `tests/runtime-consumer.test.ts`
+- `src/cli.ts`
+- `tests/cli.test.ts`
+- `tests/fixtures/cli/kafka-typegen.config.mjs`
 
 ## 6. Testing Plan
 
-- Golden/exact output verification for generated consumer API shape.
-- Runtime execution tests for:
-  - `consumer.on('event', handler)` metadata routing
-  - `consumer.onTopic('topic', handler)` discriminated union behavior
+- CLI integration tests for:
+  - config loading via `--config`
+  - generation execution writing output files
+  - invalid config failure behavior
+  - output path behavior using the config’s `outputDir`
 - Verification:
   - `pnpm test`
   - `pnpm typecheck`
@@ -91,5 +86,5 @@
 
 ## 7. Risks / Open Questions
 
-- Some message metadata fields like partition/offset/schemaId are placeholders until Step 8 runtime integration. Assumption: include them in the generated types now as optional fields so the API stays forward-compatible.
-- Topic-based unions rely on the current event/topic catalog ordering; that ordering is already deterministic, so the generated union should stay stable.
+- Config file module format needs to be explicit. Assumption: support `kafka-typegen.config.mjs` exporting either a default object or `defineConfig(...)` result.
+- Since this repo currently emits a library bundle, the CLI should remain simple and use built-in Node features rather than a separate bundling system.

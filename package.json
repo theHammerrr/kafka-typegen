@@ -4,6 +4,9 @@
   "description": "Type-safe Kafka client generation from topic definitions and Avro schemas.",
   "license": "MIT",
   "type": "module",
+  "bin": {
+    "kafka-typegen": "./dist/cli.js"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -12,6 +15,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./cli": {
+      "import": "./dist/cli.js",
+      "require": "./dist/cli.cjs"
     }
   },
   "files": [
