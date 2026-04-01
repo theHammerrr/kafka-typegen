@@ -1,3 +1,5 @@
+import { relative as relativePath } from 'node:path';
+
 import type { EventCatalog } from '../catalog/index.js';
 
 import type { GeneratedFile, GeneratorOutput, TypeGenerator } from './types.js';
@@ -17,6 +19,10 @@ function formatPropertyName(name: string): string {
 
 function formatLiteral(value: string): string {
   return `'${value.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`;
+}
+
+function toGeneratedSchemaPath(catalog: EventCatalog, schemaFilePath: string): string {
+  return relativePath(catalog.config.sources.rootDir, schemaFilePath);
 }
 
 function toCamelCase(value: string): string {
@@ -157,7 +163,7 @@ function emitEventMetadataMap(catalog: EventCatalog): string {
       `event: ${formatLiteral(event.eventName)};`,
       `topic: ${formatLiteral(event.topicName)};`,
       `subject: ${formatLiteral(event.subjectName)};`,
-      `schemaFilePath: ${formatLiteral(event.runtime.schemaFilePath)};`,
+      `schemaFilePath: ${formatLiteral(toGeneratedSchemaPath(catalog, event.runtime.schemaFilePath))};`,
       `schemaName: ${formatLiteral(event.schemaName)};`,
       `payloadType: ${formatLiteral(event.payloadTypeName)};`
     ];
@@ -188,7 +194,7 @@ function emitProducerMetadataConstant(catalog: EventCatalog): string {
       `eventName: ${formatLiteral(event.eventName)},`,
       `topicName: ${formatLiteral(event.topicName)},`,
       `subjectName: ${formatLiteral(event.subjectName)},`,
-      `schemaFilePath: ${formatLiteral(event.runtime.schemaFilePath)},`,
+      `schemaFilePath: ${formatLiteral(toGeneratedSchemaPath(catalog, event.runtime.schemaFilePath))},`,
       `schemaName: ${formatLiteral(event.schemaName)},`,
       `payloadTypeName: ${formatLiteral(event.payloadTypeName)}`
     ];

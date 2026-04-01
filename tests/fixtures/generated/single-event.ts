@@ -25,7 +25,7 @@ export interface EventMetadataByName {
     event: 'user.created';
     topic: 'user.events';
     subject: 'user.events-user.created';
-    schemaFilePath: 'F:\\GitRepos\\kafka-typegen\\tests\\fixtures\\schemas\\user-created.avsc';
+    schemaFilePath: 'user-created.avsc';
     schemaName: 'UserCreated';
     payloadType: 'UserCreatedPayload';
   };
@@ -44,7 +44,7 @@ export const producerEventMetadata: { readonly [K in EventName]: RuntimeEventMet
     eventName: 'user.created',
     topicName: 'user.events',
     subjectName: 'user.events-user.created',
-    schemaFilePath: 'F:\\GitRepos\\kafka-typegen\\tests\\fixtures\\schemas\\user-created.avsc',
+    schemaFilePath: 'user-created.avsc',
     schemaName: 'UserCreated',
     payloadTypeName: 'UserCreatedPayload'
   }
