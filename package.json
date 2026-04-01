@@ -16,9 +16,27 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./runtime": {
+      "types": "./dist/runtime/index.d.ts",
+      "import": "./dist/runtime/index.js",
+      "require": "./dist/runtime/index.cjs"
+    },
+    "./runtime/platformatic": {
+      "types": "./dist/runtime/platformatic.d.ts",
+      "import": "./dist/runtime/platformatic.js",
+      "require": "./dist/runtime/platformatic.cjs"
+    },
     "./cli": {
       "import": "./dist/cli.js",
       "require": "./dist/cli.cjs"
+    }
+  },
+  "peerDependencies": {
+    "@platformatic/kafka": "^1.31.0"
+  },
+  "peerDependenciesMeta": {
+    "@platformatic/kafka": {
+      "optional": true
     }
   },
   "files": [
@@ -32,6 +50,7 @@
     "clean": "powershell -Command \"if (Test-Path dist) { Remove-Item -Recurse -Force dist }\""
   },
   "devDependencies": {
+    "@platformatic/kafka": "1.31.0",
     "@types/node": "^24.0.0",
     "avsc": "^5.7.9",
     "tsup": "^8.3.5",

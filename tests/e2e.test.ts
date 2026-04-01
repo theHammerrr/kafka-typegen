@@ -106,6 +106,34 @@ describe('end-to-end generation', () => {
     expect(contents).toBe(expected);
   });
 
+  it('uses the platformatic runtime module when that transport is selected', async () => {
+    const workspace = await createTempWorkspace();
+    const contents = await generateFromWorkspace(workspace, {
+      outputDir: './generated',
+      runtime: {
+        transport: '@platformatic/kafka'
+      },
+      sources: {
+        rootDir: './schemas'
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+
+    expect(contents).toContain(
+      "import type { RuntimeClient, RuntimeConsumer, RuntimeEventMetadata, RuntimeProducer } from 'kafka-typegen/runtime/platformatic';"
+    );
+  });
+
   it('surfaces schema load failures with actionable messaging', async () => {
     const workspace = await createTempWorkspace();
 

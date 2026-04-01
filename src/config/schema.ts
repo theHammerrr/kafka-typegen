@@ -16,7 +16,7 @@ import { ConfigValidationError } from './types.js';
 
 const nonEmptyStringSchema = z.string().trim().min(1, 'Expected a non-empty string.');
 const subjectNameStrategySchema = z.enum(['event-name', 'topic-name', 'topic-event']);
-const runtimeTransportSchema = z.enum(['kafkajs']);
+const runtimeTransportSchema = z.enum(['kafkajs', '@platformatic/kafka']);
 
 const eventConfigSchema = z.object({
   keySchemaPath: nonEmptyStringSchema.optional(),
@@ -214,6 +214,12 @@ export function validateConfig(config: unknown): KafkaTypegenConfig {
 export function normalizeConfig(config: KafkaTypegenConfig): NormalizedKafkaTypegenConfig {
   const sourceRoot = resolvePath(config.sources?.rootDir ?? process.cwd());
   const defaultSubjectStrategy = config.schemaRegistry?.subjectStrategy ?? 'topic-event';
+  const normalizedTransport = config.runtime?.transport ?? 'kafkajs';
+  const normalizedRuntimeModule =
+    config.runtime?.module ??
+    (normalizedTransport === '@platformatic/kafka'
+      ? 'kafka-typegen/runtime/platformatic'
+      : 'kafka-typegen/runtime');
 
   const topics = [...config.topics]
     .sort((leftTopic, rightTopic) => leftTopic.name.localeCompare(rightTopic.name))
@@ -232,8 +238,8 @@ export function normalizeConfig(config: KafkaTypegenConfig): NormalizedKafkaType
     outputDir: config.outputDir,
     resolvedOutputDir: resolvePath(config.outputDir),
     runtime: {
-      module: config.runtime?.module ?? 'kafka-typegen/runtime',
-      transport: config.runtime?.transport ?? 'kafkajs'
+      module: normalizedRuntimeModule,
+      transport: normalizedTransport
     },
     sources: {
       rootDir: sourceRoot

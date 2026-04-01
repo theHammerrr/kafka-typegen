@@ -1,4 +1,4 @@
-export type RuntimeTransport = 'kafkajs';
+export type RuntimeTransport = '@platformatic/kafka' | 'kafkajs';
 
 export type SubjectNameStrategy = 'event-name' | 'topic-name' | 'topic-event';
 

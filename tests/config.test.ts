@@ -58,6 +58,28 @@ describe('config validation', () => {
     expect(validateConfig(config)).toEqual(config);
   });
 
+  it('accepts @platformatic/kafka as a runtime transport', () => {
+    const config = defineConfig({
+      outputDir: './generated',
+      runtime: {
+        transport: '@platformatic/kafka'
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './schemas/user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    } satisfies KafkaTypegenConfig);
+
+    expect(validateConfig(config)).toEqual(config);
+  });
+
   it('rejects duplicate event names across topics', () => {
     expect(() =>
       validateConfig({
@@ -280,6 +302,73 @@ describe('config normalization', () => {
     expect(normalized.events[2]).toMatchObject({
       eventName: 'user.updated',
       subjectName: 'z.topic'
+    });
+  });
+
+  it('defaults runtime modules by transport and preserves explicit overrides', () => {
+    const defaultKafkaJsConfig = resolveConfig({
+      outputDir: './generated',
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './schemas/user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+
+    const defaultPlatformaticConfig = resolveConfig({
+      outputDir: './generated',
+      runtime: {
+        transport: '@platformatic/kafka'
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './schemas/user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+
+    const overriddenPlatformaticConfig = resolveConfig({
+      outputDir: './generated',
+      runtime: {
+        module: './runtime/custom-platformatic',
+        transport: '@platformatic/kafka'
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './schemas/user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+
+    expect(defaultKafkaJsConfig.runtime).toEqual({
+      module: 'kafka-typegen/runtime',
+      transport: 'kafkajs'
+    });
+    expect(defaultPlatformaticConfig.runtime).toEqual({
+      module: 'kafka-typegen/runtime/platformatic',
+      transport: '@platformatic/kafka'
+    });
+    expect(overriddenPlatformaticConfig.runtime).toEqual({
+      module: './runtime/custom-platformatic',
+      transport: '@platformatic/kafka'
     });
   });
 });

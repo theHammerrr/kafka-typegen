@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -62,5 +64,20 @@ describe('public entrypoint', () => {
     expect(runtimeProducer.send).toBeTypeOf('function');
     expect(generator.generate).toBeTypeOf('function');
     expect(catalogBuilder.build).toBeTypeOf('function');
+  });
+
+  it('ships runtime subpath exports for generic and platformatic runtimes', async () => {
+    const runtimeModule = await import('../src/runtime/index.js');
+    const platformaticRuntimeModule = await import('../src/runtime/platformatic.js');
+    const packageJson = JSON.parse(await readFile('package.json', 'utf8')) as {
+      exports: Record<string, unknown>;
+    };
+
+    expect(runtimeModule.createRuntimeClient).toBeTypeOf('function');
+    expect(platformaticRuntimeModule.createPlatformaticRuntimeClient).toBeTypeOf('function');
+    expect(platformaticRuntimeModule.createPlatformaticProducerTransport).toBeTypeOf('function');
+    expect(platformaticRuntimeModule.createPlatformaticConsumerTransport).toBeTypeOf('function');
+    expect(packageJson.exports['./runtime']).toBeDefined();
+    expect(packageJson.exports['./runtime/platformatic']).toBeDefined();
   });
 });
