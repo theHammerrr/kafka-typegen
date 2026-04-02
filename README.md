@@ -78,6 +78,7 @@ That generated module gives you:
 - `consumer.on('user.created', handler)`
 - `consumer.events.userCreated.on(handler)`
 - `consumer.onTopic('user.events', handler)`
+- optional native transport options as the last argument, for example `producer.events.userCreated.send(payload, { acks: -1 })` and `consumer.onTopic('user.events', handler, { autocommit: false })`
 - `EventNames.UserCreated`
 - `TopicNames.UserEvents`
 - `createClient(runtime)` to bind producer and consumer together
@@ -569,6 +570,8 @@ await producer.events.userCreated.send({
   id: 'user_1',
   email: 'ada@example.com',
   isAdmin: true
+}, {
+  acks: -1
 });
 ```
 
@@ -636,6 +639,8 @@ const runtimeConsumer = createPlatformaticRuntimeConsumer({
 const consumer = createConsumer(runtimeConsumer);
 await consumer.events.userCreated.on(async (message) => {
   message.payload.isAdmin;
+}, {
+  autocommit: false
 });
 ```
 

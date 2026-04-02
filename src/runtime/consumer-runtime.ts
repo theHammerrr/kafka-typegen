@@ -7,12 +7,19 @@ import type {
   RuntimeEventMetadata
 } from './types.js';
 
-export class DefaultRuntimeConsumer implements RuntimeConsumer {
-  public constructor(private readonly options: ResolvedRuntimeClientOptions) {}
+export class DefaultRuntimeConsumer<TSubscriptionOptions = unknown>
+  implements RuntimeConsumer<TSubscriptionOptions> {
+  public constructor(
+    private readonly options: ResolvedRuntimeClientOptions<
+      unknown,
+      TSubscriptionOptions
+    >
+  ) {}
 
   public async on<TPayload>(
     metadata: RuntimeEventMetadata,
-    handler: (message: RuntimeConsumerMessage<TPayload>) => Promise<void> | void
+    handler: (message: RuntimeConsumerMessage<TPayload>) => Promise<void> | void,
+    options?: TSubscriptionOptions
   ): Promise<void> {
     await this.options.consumerTransport.onTopic(metadata.topicName, async (message) => {
       const receivedEventName = message.headers?.[RUNTIME_EVENT_HEADER];
@@ -22,13 +29,14 @@ export class DefaultRuntimeConsumer implements RuntimeConsumer {
 
       const payload = await this.options.serialization.deserialize<TPayload>(metadata, message);
       await handler(toConsumerMessage(metadata, message, payload));
-    });
+    }, options);
   }
 
   public async onTopic<TPayload>(
     topicName: string,
     metadataByEvent: Readonly<Record<string, RuntimeEventMetadata>>,
-    handler: (message: RuntimeConsumerMessage<TPayload>) => Promise<void> | void
+    handler: (message: RuntimeConsumerMessage<TPayload>) => Promise<void> | void,
+    options?: TSubscriptionOptions
   ): Promise<void> {
     await this.options.consumerTransport.onTopic(topicName, async (message) => {
       const receivedEventName = message.headers?.[RUNTIME_EVENT_HEADER];
@@ -43,6 +51,6 @@ export class DefaultRuntimeConsumer implements RuntimeConsumer {
 
       const payload = await this.options.serialization.deserialize<TPayload>(metadata, message);
       await handler(toConsumerMessage(metadata, message, payload));
-    });
+    }, options);
   }
 }

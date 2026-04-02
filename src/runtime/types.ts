@@ -80,19 +80,24 @@ export type RuntimeSerializationOptions =
       readonly serialization: RuntimeSerializationHooks;
     };
 
-export interface RuntimeTransportProducer {
-  send(message: RuntimeOutgoingMessage): Promise<void>;
+export interface RuntimeTransportProducer<TSendOptions = unknown> {
+  send(message: RuntimeOutgoingMessage, options?: TSendOptions): Promise<void>;
 }
 
-export interface RuntimeTransportConsumer {
+export interface RuntimeTransportConsumer<TSubscriptionOptions = unknown> {
   onTopic(
     topicName: string,
-    handler: (message: RuntimeIncomingMessage) => Promise<void> | void
+    handler: (message: RuntimeIncomingMessage) => Promise<void> | void,
+    options?: TSubscriptionOptions
   ): Promise<void>;
 }
 
-export interface RuntimeProducer {
-  send(metadata: RuntimeEventMetadata, payload: unknown): Promise<void>;
+export interface RuntimeProducer<TSendOptions = unknown> {
+  send(
+    metadata: RuntimeEventMetadata,
+    payload: unknown,
+    options?: TSendOptions
+  ): Promise<void>;
 }
 
 export interface RuntimeConsumerMessage<TPayload = unknown> {
@@ -109,38 +114,49 @@ export interface RuntimeConsumerMessage<TPayload = unknown> {
   readonly topicName: string;
 }
 
-export interface RuntimeConsumer {
+export interface RuntimeConsumer<TSubscriptionOptions = unknown> {
   on<TPayload>(
     metadata: RuntimeEventMetadata,
-    handler: (message: RuntimeConsumerMessage<TPayload>) => Promise<void> | void
+    handler: (message: RuntimeConsumerMessage<TPayload>) => Promise<void> | void,
+    options?: TSubscriptionOptions
   ): Promise<void>;
   onTopic<TPayload>(
     topicName: string,
     metadataByEvent: Readonly<Record<string, RuntimeEventMetadata>>,
-    handler: (message: RuntimeConsumerMessage<TPayload>) => Promise<void> | void
+    handler: (message: RuntimeConsumerMessage<TPayload>) => Promise<void> | void,
+    options?: TSubscriptionOptions
   ): Promise<void>;
 }
 
-export interface RuntimeClient {
-  readonly consumer: RuntimeConsumer;
-  readonly producer: RuntimeProducer;
+export interface RuntimeClient<
+  TSendOptions = unknown,
+  TSubscriptionOptions = unknown
+> {
+  readonly consumer: RuntimeConsumer<TSubscriptionOptions>;
+  readonly producer: RuntimeProducer<TSendOptions>;
 }
 
-export interface ResolvedRuntimeClientOptions {
-  readonly consumerTransport: RuntimeTransportConsumer;
+export interface ResolvedRuntimeClientOptions<
+  TSendOptions = unknown,
+  TSubscriptionOptions = unknown
+> {
+  readonly consumerTransport: RuntimeTransportConsumer<TSubscriptionOptions>;
   readonly serialization: RuntimeSerializationHooks;
-  readonly producerTransport: RuntimeTransportProducer;
+  readonly producerTransport: RuntimeTransportProducer<TSendOptions>;
 }
 
-export type RuntimeClientOptions = {
-  readonly consumerTransport: RuntimeTransportConsumer;
-  readonly producerTransport: RuntimeTransportProducer;
+export type RuntimeClientOptions<
+  TSendOptions = unknown,
+  TSubscriptionOptions = unknown
+> = {
+  readonly consumerTransport: RuntimeTransportConsumer<TSubscriptionOptions>;
+  readonly producerTransport: RuntimeTransportProducer<TSendOptions>;
 } & RuntimeSerializationOptions;
 
-export type RuntimeProducerOptions = {
-  readonly producerTransport: RuntimeTransportProducer;
+export type RuntimeProducerOptions<TSendOptions = unknown> = {
+  readonly producerTransport: RuntimeTransportProducer<TSendOptions>;
 } & RuntimeSerializationOptions;
 
-export type RuntimeConsumerOptions = {
-  readonly consumerTransport: RuntimeTransportConsumer;
+export type RuntimeConsumerOptions<TSubscriptionOptions = unknown> = {
+  readonly consumerTransport: RuntimeTransportConsumer<TSubscriptionOptions>;
 } & RuntimeSerializationOptions;
