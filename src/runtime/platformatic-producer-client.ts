@@ -1,18 +1,19 @@
 import { createRuntimeProducer } from './producer-client.js';
 import { createPlatformaticProducerTransport } from './platformatic-producer.js';
 import type { PlatformaticProducerLike } from './platformatic-types.js';
-import type { RuntimeProducer, RuntimeSerializationHooks } from './types.js';
+import type { RuntimeProducer, RuntimeSerializationOptions } from './types.js';
 
-export interface PlatformaticRuntimeProducerOptions<TKey = unknown> {
+export type PlatformaticRuntimeProducerOptions<TKey = unknown> = RuntimeSerializationOptions & {
   readonly producer: PlatformaticProducerLike<TKey>;
-  readonly serialization: RuntimeSerializationHooks;
-}
+};
 
 export function createPlatformaticRuntimeProducer<TKey = unknown>(
   options: PlatformaticRuntimeProducerOptions<TKey>
 ): RuntimeProducer {
   return createRuntimeProducer({
     producerTransport: createPlatformaticProducerTransport(options.producer),
-    serialization: options.serialization
+    ...(options.schemaRegistry !== undefined
+      ? { schemaRegistry: options.schemaRegistry }
+      : { serialization: options.serialization })
   });
 }

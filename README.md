@@ -372,8 +372,10 @@ You provide:
 
 - `producerTransport.send(message)`
 - `consumerTransport.onTopic(topicName, handler)`
-- `serialization.serialize(metadata, payload)`
-- `serialization.deserialize(metadata, message)`
+- either `serialization.serialize(metadata, payload)` / `serialization.deserialize(metadata, message)`
+- or `schemaRegistry`, which can be either:
+  - direct Confluent Schema Registry connection options
+  - an already-created registry client that satisfies the runtime registry interface
 
 ### Platformatic runtime
 
@@ -416,6 +418,106 @@ const runtime = createPlatformaticRuntimeClient({
     async deserialize(_metadata, message) {
       return JSON.parse(new TextDecoder().decode(message.value));
     }
+  }
+});
+
+const client = createClient(runtime);
+```
+
+### Runtime Schema Registry Support
+
+Runtime helpers now support two mutually exclusive serialization modes:
+
+- `serialization`
+- `schemaRegistry`
+
+You must provide exactly one of them. Passing both is rejected as ambiguous, and passing neither is rejected because the runtime cannot encode or decode payloads without one.
+
+The `schemaRegistry` path supports two forms:
+
+- direct Confluent-compatible options:
+
+```ts
+schemaRegistry: {
+  url: 'http://localhost:8081',
+  auth: {
+    username: '...',
+    password: '...'
+  }
+}
+```
+
+- an explicit runtime registry client:
+
+```ts
+schemaRegistry: createConfluentSchemaRegistryRuntimeClient({
+  url: 'http://localhost:8081'
+})
+```
+
+The direct config form is the simplest default and is the recommended path unless you already need to manage the registry client yourself.
+
+At runtime, the library uses generated event metadata such as `subjectName`, `eventName`, and `topicName` to:
+
+- resolve the latest schema for a subject on the producer side
+- encode payloads with Avro
+- prepend Confluent wire format with the schema id
+- read schema ids from incoming messages on the consumer side
+- resolve schemas by id
+- decode Avro payloads back into the typed generated message payload
+
+The runtime keeps internal caches for subject and schema-id lookups so repeated sends and receives do not refetch the same schema information on every message.
+
+The expected registry client shape is intentionally small and runtime-focused:
+
+```ts
+interface SchemaRegistryRuntimeClient {
+  getLatestSchema(subjectName: string): Promise<{
+    schemaId: number;
+    schema: string | Record<string, unknown>;
+    subjectName?: string;
+  }>;
+  getSchemaById(schemaId: number): Promise<{
+    schemaId: number;
+    schema: string | Record<string, unknown>;
+    subjectName?: string;
+  }>;
+}
+```
+
+Generic runtime example:
+
+```ts
+import { createRuntimeClient } from 'kafka-typegen/runtime';
+
+const runtime = createRuntimeClient({
+  producerTransport,
+  consumerTransport,
+  schemaRegistry: {
+    url: 'http://localhost:8081'
+  }
+});
+```
+
+Platformatic example:
+
+```ts
+import { Consumer, Producer } from '@platformatic/kafka';
+import { createPlatformaticRuntimeClient } from 'kafka-typegen/runtime';
+import { createClient } from '@app/kafka';
+
+const runtime = createPlatformaticRuntimeClient({
+  producer: new Producer({
+    clientId: 'app-producer',
+    bootstrapBrokers: ['localhost:9092']
+  }),
+  consumer: new Consumer({
+    clientId: 'app-consumer',
+    groupId: 'app-group',
+    bootstrapBrokers: ['localhost:9092']
+  }),
+  schemaRegistry: {
+    url: 'http://localhost:8081'
   }
 });
 
@@ -470,6 +572,17 @@ await producer.events.userCreated.send({
 });
 ```
 
+The same helpers also support Schema Registry directly:
+
+```ts
+const runtimeProducer = createRuntimeProducer({
+  producerTransport,
+  schemaRegistry: {
+    url: 'http://localhost:8081'
+  }
+});
+```
+
 Platformatic runtime:
 
 ```ts
@@ -499,6 +612,30 @@ await producer.events.userCreated.send({
   id: 'user_1',
   email: 'ada@example.com',
   isAdmin: true
+});
+```
+
+And the consumer-only path works the same way:
+
+```ts
+import { Consumer } from '@platformatic/kafka';
+import { createPlatformaticRuntimeConsumer } from 'kafka-typegen/runtime';
+import { createConsumer } from '@app/kafka';
+
+const runtimeConsumer = createPlatformaticRuntimeConsumer({
+  consumer: new Consumer({
+    clientId: 'app-consumer',
+    groupId: 'app-group',
+    bootstrapBrokers: ['localhost:9092']
+  }),
+  schemaRegistry: {
+    url: 'http://localhost:8081'
+  }
+});
+
+const consumer = createConsumer(runtimeConsumer);
+await consumer.events.userCreated.on(async (message) => {
+  message.payload.isAdmin;
 });
 ```
 
@@ -589,7 +726,6 @@ What this package does today:
 What it does not do automatically:
 
 - manage runtime client lifecycle for you
-- own schema-registry serialization logic out of the box
 - generate multiple output files per config
 - mutate existing Kafka topics to reconcile drift
 - mutate existing Schema Registry subjects when schemas differ

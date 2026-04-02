@@ -1,5 +1,6 @@
 import { createRuntimeClient } from './client.js';
 export type {
+  SchemaRegistryRuntimeClient,
   RuntimeClient,
   RuntimeClientOptions,
   RuntimeConsumer,
@@ -34,7 +35,9 @@ export function createPlatformaticRuntimeClient<TKey = unknown>(
       ...(options.consumeOptions !== undefined ? { consumeOptions: options.consumeOptions } : {})
     }),
     producerTransport: createPlatformaticProducerTransport(options.producer),
-    serialization: options.serialization
+    ...(options.schemaRegistry !== undefined
+      ? { schemaRegistry: options.schemaRegistry }
+      : { serialization: options.serialization })
   };
 
   return createRuntimeClient(runtimeOptions);

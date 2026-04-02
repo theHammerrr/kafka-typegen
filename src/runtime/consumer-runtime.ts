@@ -1,9 +1,14 @@
 import { toConsumerMessage } from './consumer-message.js';
 import { RUNTIME_EVENT_HEADER } from './producer-runtime.js';
-import type { RuntimeClientOptions, RuntimeConsumer, RuntimeConsumerMessage, RuntimeEventMetadata } from './types.js';
+import type {
+  ResolvedRuntimeClientOptions,
+  RuntimeConsumer,
+  RuntimeConsumerMessage,
+  RuntimeEventMetadata
+} from './types.js';
 
 export class DefaultRuntimeConsumer implements RuntimeConsumer {
-  public constructor(private readonly options: RuntimeClientOptions) {}
+  public constructor(private readonly options: ResolvedRuntimeClientOptions) {}
 
   public async on<TPayload>(
     metadata: RuntimeEventMetadata,
