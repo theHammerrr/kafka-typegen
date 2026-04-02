@@ -36,7 +36,7 @@ function isRuntimeEventMetadata(value: unknown): value is RuntimeEventMetadata {
 }
 
 export function createPlatformaticRuntimeConsumer<
-  TKey = unknown,
+  TKey = Buffer,
   TConsumer extends PlatformaticConsumerLike<TKey> = PlatformaticConsumerLike<TKey>
 >(
   options: PlatformaticRuntimeConsumerOptions<TKey, TConsumer>
@@ -57,7 +57,7 @@ export function createPlatformaticRuntimeConsumer<
 }
 
 export function toPlatformaticRuntimeConsumer<
-  TKey = unknown,
+  TKey = Buffer,
   TConsumer extends PlatformaticConsumerLike<TKey> = PlatformaticConsumerLike<TKey>
 >(
   consumer: TConsumer,

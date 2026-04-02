@@ -36,7 +36,7 @@ function isRuntimeEventMetadata(value: unknown): value is RuntimeEventMetadata {
 }
 
 export function createPlatformaticRuntimeProducer<
-  TKey = unknown,
+  TKey = Buffer,
   TProducer extends PlatformaticProducerLike<TKey> = PlatformaticProducerLike<TKey>
 >(
   options: PlatformaticRuntimeProducerOptions<TKey, TProducer>
@@ -53,7 +53,7 @@ export function createPlatformaticRuntimeProducer<
 }
 
 export function toPlatformaticRuntimeProducer<
-  TKey = unknown,
+  TKey = Buffer,
   TProducer extends PlatformaticProducerLike<TKey> = PlatformaticProducerLike<TKey>
 >(
   producer: TProducer,

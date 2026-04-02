@@ -48,7 +48,7 @@ export type PlatformaticRuntimeClient<
 };
 
 export function createPlatformaticRuntimeClient<
-  TKey = unknown,
+  TKey = Buffer,
   TProducer extends PlatformaticProducerLike<TKey> = PlatformaticProducerLike<TKey>,
   TConsumer extends PlatformaticConsumerLike<TKey> = PlatformaticConsumerLike<TKey>
 >(
