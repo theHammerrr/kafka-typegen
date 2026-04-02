@@ -2,7 +2,14 @@ export type RuntimeTransport = '@platformatic/kafka' | 'kafkajs';
 
 export type SubjectNameStrategy = 'event-name' | 'topic-name' | 'topic-event';
 
+export interface KafkaTypegenSchemaRegistryAuthConfig {
+  readonly password?: string;
+  readonly token?: string;
+  readonly username?: string;
+}
+
 export interface KafkaTypegenSchemaRegistryConfig {
+  readonly auth?: KafkaTypegenSchemaRegistryAuthConfig;
   readonly url: string;
   readonly subjectStrategy?: SubjectNameStrategy;
 }
@@ -28,9 +35,6 @@ export interface KafkaTypegenSyncKafkaConfig {
 
 export interface KafkaTypegenSyncSchemaRegistryConfig {
   readonly failOnDrift?: boolean;
-  readonly password?: string;
-  readonly url?: string;
-  readonly username?: string;
 }
 
 export interface KafkaTypegenSyncConfig {
@@ -69,9 +73,20 @@ export interface KafkaTypegenTopicConfig {
 }
 
 export interface KafkaTypegenTopicSyncConfig {
-  readonly configEntries?: Readonly<Record<string, string>>;
-  readonly partitions?: number;
-  readonly replicationFactor?: number;
+  readonly cleanupPolicy?: 'compact' | 'compact,delete' | 'delete';
+  readonly compressionType?:
+    | 'gzip'
+    | 'lz4'
+    | 'producer'
+    | 'snappy'
+    | 'uncompressed'
+    | 'zstd';
+  readonly maxMessageBytes?: number;
+  readonly minCompactionLagMs?: number;
+  readonly partitions: number;
+  readonly replicationFactor: number;
+  readonly retentionBytes?: number;
+  readonly retentionMs?: number;
 }
 
 export interface KafkaTypegenConfig {
@@ -86,6 +101,7 @@ export interface KafkaTypegenConfig {
 }
 
 export interface NormalizedSchemaRegistryConfig {
+  readonly auth?: KafkaTypegenSchemaRegistryAuthConfig;
   readonly url: string;
   readonly subjectStrategy: SubjectNameStrategy;
 }
@@ -104,10 +120,9 @@ export interface NormalizedSyncKafkaConfig {
 }
 
 export interface NormalizedSyncSchemaRegistryConfig {
+  readonly auth?: KafkaTypegenSchemaRegistryAuthConfig;
   readonly failOnDrift: boolean;
-  readonly password?: string;
   readonly url: string;
-  readonly username?: string;
 }
 
 export interface NormalizedSyncConfig {
@@ -145,14 +160,25 @@ export interface NormalizedTopicConfig {
   readonly keySchemaPath?: string;
   readonly resolvedKeySchemaPath?: string;
   readonly subjectStrategy: SubjectNameStrategy;
-  readonly sync: NormalizedTopicSyncConfig;
+  readonly sync?: NormalizedTopicSyncConfig;
   readonly events: readonly NormalizedEventConfig[];
 }
 
 export interface NormalizedTopicSyncConfig {
-  readonly configEntries: Readonly<Record<string, string>>;
+  readonly cleanupPolicy?: 'compact' | 'compact,delete' | 'delete';
+  readonly compressionType?:
+    | 'gzip'
+    | 'lz4'
+    | 'producer'
+    | 'snappy'
+    | 'uncompressed'
+    | 'zstd';
+  readonly maxMessageBytes?: number;
+  readonly minCompactionLagMs?: number;
   readonly partitions: number;
   readonly replicationFactor: number;
+  readonly retentionBytes?: number;
+  readonly retentionMs?: number;
 }
 
 export interface NormalizedKafkaTypegenConfig {

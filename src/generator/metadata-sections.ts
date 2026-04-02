@@ -61,3 +61,15 @@ export function emitTopicMetadataConstant(catalog: EventCatalog): string {
 
   return `export const topicEventMetadata: { readonly [K in TopicName]: Readonly<Record<string, RuntimeEventMetadata>> } = {\n${indent(entries.join(',\n'))}\n};`;
 }
+
+export function emitSchemaRegistryConfigConstant(
+  catalog: EventCatalog
+): string | undefined {
+  if (catalog.config.schemaRegistry === undefined) {
+    return undefined;
+  }
+
+  return `export const SchemaRegistryConfig = {\n${indent(
+    `url: ${formatLiteral(catalog.config.schemaRegistry.url)}`
+  )}\n} as const;`;
+}

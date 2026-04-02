@@ -84,6 +84,10 @@ describe('config validation', () => {
     const config = defineConfig({
       outputDir: './generated',
       schemaRegistry: {
+        auth: {
+          password: 'registry-password',
+          username: 'registry-user'
+        },
         url: 'http://localhost:8081'
       },
       sync: {
@@ -104,8 +108,14 @@ describe('config validation', () => {
           ],
           name: 'user.events',
           sync: {
+            cleanupPolicy: 'compact',
+            compressionType: 'lz4',
+            maxMessageBytes: 1_048_576,
+            minCompactionLagMs: 60000,
             partitions: 3,
-            replicationFactor: 2
+            replicationFactor: 2,
+            retentionBytes: 10_485_760,
+            retentionMs: 86_400_000
           }
         }
       ]
@@ -247,6 +257,78 @@ describe('config validation', () => {
         ])
       );
     }
+  });
+
+  it('rejects legacy sync schema registry connection fields', () => {
+    expect(() =>
+      validateConfig({
+        outputDir: './generated',
+        sync: {
+          schemaRegistry: {
+            url: 'http://localhost:8081'
+          }
+        },
+        topics: [
+          {
+            events: [
+              {
+                name: 'user.created',
+                schemaPath: './schemas/user-created.avsc'
+              }
+            ],
+            name: 'user.events'
+          }
+        ]
+      })
+    ).toThrowError(ConfigValidationError);
+  });
+
+  it('requires topic sync config for every topic when kafka sync is enabled', () => {
+    expect(() =>
+      validateConfig({
+        outputDir: './generated',
+        sync: {
+          kafka: {
+            brokers: ['localhost:9092']
+          }
+        },
+        topics: [
+          {
+            events: [
+              {
+                name: 'user.created',
+                schemaPath: './schemas/user-created.avsc'
+              }
+            ],
+            name: 'user.events'
+          }
+        ]
+      })
+    ).toThrowError(ConfigValidationError);
+  });
+
+  it('requires top-level schema registry config when schema registry sync policy is enabled', () => {
+    expect(() =>
+      validateConfig({
+        outputDir: './generated',
+        sync: {
+          schemaRegistry: {
+            failOnDrift: true
+          }
+        },
+        topics: [
+          {
+            events: [
+              {
+                name: 'user.created',
+                schemaPath: './schemas/user-created.avsc'
+              }
+            ],
+            name: 'user.events'
+          }
+        ]
+      })
+    ).toThrowError(ConfigValidationError);
   });
 });
 
@@ -412,6 +494,9 @@ describe('config normalization', () => {
     const normalized = resolveConfig({
       outputDir: './generated',
       schemaRegistry: {
+        auth: {
+          token: 'registry-token'
+        },
         url: 'http://localhost:8081'
       },
       sync: {
@@ -427,7 +512,11 @@ describe('config normalization', () => {
               schemaPath: './schemas/user-created.avsc'
             }
           ],
-          name: 'user.events'
+          name: 'user.events',
+          sync: {
+            partitions: 1,
+            replicationFactor: 1
+          }
         }
       ]
     });
@@ -440,14 +529,54 @@ describe('config normalization', () => {
         ssl: false
       },
       schemaRegistry: {
+        auth: {
+          token: 'registry-token'
+        },
         failOnDrift: false,
         url: 'http://localhost:8081'
       }
     });
+    expect(normalized.schemaRegistry).toEqual({
+      auth: {
+        token: 'registry-token'
+      },
+      subjectStrategy: 'topic-event',
+      url: 'http://localhost:8081'
+    });
     expect(normalized.topics[0]?.sync).toEqual({
-      configEntries: {},
       partitions: 1,
       replicationFactor: 1
     });
+  });
+
+  it('preserves registry-only sync without requiring topic sync config', () => {
+    const normalized = resolveConfig({
+      outputDir: './generated',
+      schemaRegistry: {
+        url: 'http://localhost:8081'
+      },
+      sync: {
+        schemaRegistry: {
+          failOnDrift: true
+        }
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './schemas/user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+
+    expect(normalized.sync?.schemaRegistry).toEqual({
+      failOnDrift: true,
+      url: 'http://localhost:8081'
+    });
+    expect(normalized.topics[0]?.sync).toBeUndefined();
   });
 });

@@ -21,6 +21,15 @@ export function validateSemanticConfig(config: KafkaTypegenConfig): void {
       topicNameIndexes.set(topic.name, topicIndex);
     }
 
+    if (config.sync?.kafka !== undefined && topic.sync === undefined) {
+      issues.push(
+        buildValidationIssue(
+          ['topics', topicIndex, 'sync'],
+          'Topic sync config is required when sync.kafka is enabled.'
+        )
+      );
+    }
+
     topic.events.forEach((event, eventIndex) => {
       const existingEvent = eventNameIndexes.get(event.name);
 
@@ -36,6 +45,18 @@ export function validateSemanticConfig(config: KafkaTypegenConfig): void {
       }
     });
   });
+
+  if (
+    config.sync?.schemaRegistry !== undefined &&
+    config.schemaRegistry === undefined
+  ) {
+    issues.push(
+      buildValidationIssue(
+        ['schemaRegistry'],
+        'Top-level schemaRegistry config is required when sync.schemaRegistry is enabled.'
+      )
+    );
+  }
 
   if (issues.length > 0) {
     throw new ConfigValidationError(issues);

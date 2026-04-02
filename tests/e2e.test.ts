@@ -190,7 +190,8 @@ describe('end-to-end generation', () => {
             ],
             name: 'user.events',
             sync: {
-              partitions: 2
+              partitions: 2,
+              replicationFactor: 1
             }
           }
         ]
