@@ -14,14 +14,14 @@ export function emitProducerTypes(catalog: EventCatalog): string {
     indent(groupedEntries.join('\n')),
     '}',
     '',
-    'export interface GeneratedProducer {',
+    'export type GeneratedProducer<TRuntimeProducer extends RuntimeProducer = RuntimeProducer> = TRuntimeProducer & {',
     indent(
       [
         'send<E extends EventName>(event: E, payload: EventPayloadByName[E]): Promise<void>;',
         'events: GeneratedProducerEvents;'
       ].join('\n')
     ),
-    '}'
+    '};'
   ].join('\n');
 }
 
@@ -40,19 +40,30 @@ export function emitProducerFactory(catalog: EventCatalog): string {
   });
 
   const body = [
-    'return {',
+    'const producer = Object.create(runtimeProducer) as GeneratedProducer<TRuntimeProducer>;',
+    '',
+    'producer.send = ((eventOrMetadata: unknown, payload: unknown) => {',
     indent(
       [
-        'send(event, payload) {',
-        indent('return runtimeProducer.send(producerEventMetadata[event], payload);'),
-        '},',
-        'events: {',
-        indent(groupedEntries.join(',\n')),
-        '}'
+        'if (typeof eventOrMetadata === \'string\' && Object.hasOwn(producerEventMetadata, eventOrMetadata)) {',
+        indent(
+          'return runtimeProducer.send(producerEventMetadata[eventOrMetadata as EventName], payload);'
+        ),
+        '}',
+        '',
+        'return runtimeProducer.send(eventOrMetadata as never, payload as never);'
       ].join('\n')
     ),
-    '};'
+    '}) as GeneratedProducer<TRuntimeProducer>[\'send\'];',
+    '',
+    'producer.events = {',
+    indent(
+      groupedEntries.join(',\n')
+    ),
+    '};',
+    '',
+    'return producer;'
   ].join('\n');
 
-  return `export function createProducer(runtimeProducer: RuntimeProducer): GeneratedProducer {\n${indent(body)}\n}`;
+  return `export function createProducer<TRuntimeProducer extends RuntimeProducer>(runtimeProducer: TRuntimeProducer): GeneratedProducer<TRuntimeProducer> {\n${indent(body)}\n}`;
 }

@@ -1,22 +1,80 @@
 import { createRuntimeConsumer } from './consumer-client.js';
 import { createPlatformaticConsumerTransport } from './platformatic-consumer.js';
 import type { PlatformaticConsumerLike, PlatformaticConsumerTransportOptions } from './platformatic-types.js';
-import type { RuntimeConsumer, RuntimeSerializationOptions } from './types.js';
+import type {
+  RuntimeConsumer,
+  RuntimeEventMetadata,
+  RuntimeSerializationOptions
+} from './types.js';
 
-export type PlatformaticRuntimeConsumerOptions<TKey = unknown> = PlatformaticConsumerTransportOptions<TKey> &
-  RuntimeSerializationOptions & {
-  readonly consumer: PlatformaticConsumerLike<TKey>;
+type PlatformaticConsumerEventSource = {
+  on?: (eventName: string | symbol, listener: (...args: unknown[]) => void) => unknown;
 };
 
-export function createPlatformaticRuntimeConsumer<TKey = unknown>(
-  options: PlatformaticRuntimeConsumerOptions<TKey>
-): RuntimeConsumer {
-  return createRuntimeConsumer({
-    consumerTransport: createPlatformaticConsumerTransport(options.consumer, {
-      ...(options.consumeOptions !== undefined ? { consumeOptions: options.consumeOptions } : {})
-    }),
-    ...(options.schemaRegistry !== undefined
-      ? { schemaRegistry: options.schemaRegistry }
-      : { serialization: options.serialization })
-  });
+export type PlatformaticRuntimeConsumer<TConsumer = PlatformaticConsumerLike> = TConsumer &
+  RuntimeConsumer;
+
+export type PlatformaticRuntimeConsumerOptions<
+  TKey = unknown,
+  TConsumer extends PlatformaticConsumerLike<TKey> = PlatformaticConsumerLike<TKey>
+> = PlatformaticConsumerTransportOptions<TKey> &
+  RuntimeSerializationOptions & {
+  readonly consumer: TConsumer;
+};
+
+function isRuntimeEventMetadata(value: unknown): value is RuntimeEventMetadata {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'eventName' in value &&
+    'payloadTypeName' in value &&
+    'schemaFilePath' in value &&
+    'schemaName' in value &&
+    'subjectName' in value &&
+    'topicName' in value
+  );
+}
+
+export function createPlatformaticRuntimeConsumer<
+  TKey = unknown,
+  TConsumer extends PlatformaticConsumerLike<TKey> = PlatformaticConsumerLike<TKey>
+>(
+  options: PlatformaticRuntimeConsumerOptions<TKey, TConsumer>
+): PlatformaticRuntimeConsumer<TConsumer> {
+  return toPlatformaticRuntimeConsumer<TKey, TConsumer>(
+    options.consumer,
+    createRuntimeConsumer({
+      consumerTransport: createPlatformaticConsumerTransport(options.consumer, {
+        ...(options.consumeOptions !== undefined
+          ? { consumeOptions: options.consumeOptions }
+          : {})
+      }),
+      ...(options.schemaRegistry !== undefined
+        ? { schemaRegistry: options.schemaRegistry }
+        : { serialization: options.serialization })
+    })
+  );
+}
+
+export function toPlatformaticRuntimeConsumer<
+  TKey = unknown,
+  TConsumer extends PlatformaticConsumerLike<TKey> = PlatformaticConsumerLike<TKey>
+>(
+  consumer: TConsumer,
+  runtimeConsumer: RuntimeConsumer
+): PlatformaticRuntimeConsumer<TConsumer> {
+  const client = Object.create(consumer) as PlatformaticRuntimeConsumer<TConsumer>;
+  const nativeOn = (consumer as PlatformaticConsumerEventSource).on?.bind(consumer);
+
+  client.on = ((eventOrMetadata: unknown, handler: unknown) =>
+    isRuntimeEventMetadata(eventOrMetadata)
+      ? runtimeConsumer.on(eventOrMetadata, handler as Parameters<RuntimeConsumer['on']>[1])
+      : nativeOn?.(
+          eventOrMetadata as string | symbol,
+          handler as (...args: unknown[]) => void
+        )) as PlatformaticRuntimeConsumer<TConsumer>['on'];
+
+  client.onTopic = runtimeConsumer.onTopic.bind(runtimeConsumer);
+
+  return client;
 }

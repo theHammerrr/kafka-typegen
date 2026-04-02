@@ -15,8 +15,12 @@ export interface PlatformaticConsumerTransportOptions<TKey = unknown> {
   readonly consumeOptions?: Omit<ConsumeOptions<TKey, Buffer, Buffer, Buffer>, 'topics'>;
 }
 
-export type PlatformaticRuntimeClientOptions<TKey = unknown> = PlatformaticConsumerTransportOptions<TKey> &
+export type PlatformaticRuntimeClientOptions<
+  TKey = unknown,
+  TProducer extends PlatformaticProducerLike<TKey> = PlatformaticProducerLike<TKey>,
+  TConsumer extends PlatformaticConsumerLike<TKey> = PlatformaticConsumerLike<TKey>
+> = PlatformaticConsumerTransportOptions<TKey> &
   RuntimeSerializationOptions & {
-  readonly consumer: PlatformaticConsumerLike<TKey>;
-  readonly producer: PlatformaticProducerLike<TKey>;
+  readonly consumer: TConsumer;
+  readonly producer: TProducer;
 };

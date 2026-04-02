@@ -370,4 +370,58 @@ describe('platformatic runtime adapter', () => {
       })
     ]);
   });
+
+  it('preserves native producer and consumer methods on wrapped platformatic runtime clients', async () => {
+    const close = vi.fn();
+    const nativeSend = vi.fn().mockResolvedValue(undefined);
+    const nativeOn = vi.fn().mockReturnValue('native-on-result');
+    const stream = new MockMessagesStream();
+    const runtimeClient = createPlatformaticRuntimeClient({
+      consumer: {
+        consume: vi.fn().mockResolvedValue(stream),
+        on: nativeOn,
+        topics: ['user.events']
+      },
+      producer: {
+        close,
+        send: nativeSend
+      },
+      serialization: {
+        async deserialize(_metadata, message) {
+          return JSON.parse(Buffer.from(message.value).toString('utf8'));
+        },
+        async serialize(_metadata, payload) {
+          return {
+            value: Buffer.from(JSON.stringify(payload))
+          };
+        }
+      }
+    });
+
+    await runtimeClient.producer.send({
+      messages: [
+        {
+          topic: 'user.events',
+          value: Buffer.from('native')
+        }
+      ]
+    });
+    runtimeClient.producer.close();
+
+    const nativeOnResult = runtimeClient.consumer.on('consumer:error', () => {});
+
+    expect(nativeSend).toHaveBeenCalledWith({
+      messages: [
+        {
+          topic: 'user.events',
+          value: Buffer.from('native')
+        }
+      ]
+    }, undefined);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(nativeOn).toHaveBeenCalledTimes(1);
+    expect(nativeOn).toHaveBeenCalledWith('consumer:error', expect.any(Function));
+    expect(nativeOnResult).toBe('native-on-result');
+    expect(runtimeClient.consumer.topics).toEqual(['user.events']);
+  });
 });
