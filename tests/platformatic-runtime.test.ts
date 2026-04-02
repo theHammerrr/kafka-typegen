@@ -97,9 +97,9 @@ describe('platformatic runtime adapter', () => {
     expect(send).toHaveBeenCalledWith({
       messages: [
         {
-          headers: {
-            'x-kafka-typegen-event': Buffer.from('user.created')
-          },
+          headers: new Map([
+            [Buffer.from('x-kafka-typegen-event'), Buffer.from('user.created')]
+          ]),
           key: Buffer.from('user-1'),
           topic: 'user.events',
           value: Buffer.from([1, 2, 3])

@@ -2,12 +2,17 @@ import { Buffer } from 'node:buffer';
 
 export function toPlatformaticHeaders(
   headers?: Readonly<Record<string, string>>
-): Record<string, Buffer> | undefined {
+): Map<Buffer, Buffer> | undefined {
   if (headers === undefined) {
     return undefined;
   }
 
-  return Object.fromEntries(Object.entries(headers).map(([key, value]) => [key, Buffer.from(value)]));
+  return new Map(
+    Object.entries(headers).map(([key, value]) => [
+      Buffer.from(key),
+      Buffer.from(value)
+    ])
+  );
 }
 
 export function toRuntimeHeaders(
