@@ -18,6 +18,16 @@ export type EventName = 'user.created' | 'user.updated';
 
 export type TopicName = 'user.events' | 'user.lifecycle';
 
+export const EventNames = {
+  UserCreated: 'user.created',
+  UserUpdated: 'user.updated',
+} as const;
+
+export const TopicNames = {
+  UserEvents: 'user.events',
+  UserLifecycle: 'user.lifecycle',
+} as const;
+
 export interface EventPayloadByName {
   'user.created': UserCreatedPayload;
   'user.updated': UserUpdatedPayload;

@@ -19,7 +19,7 @@ pnpm demo
 pnpm start
 ```
 
-`pnpm demo` rebuilds the library, regenerates the demo client into `examples/demo-app/generated`, and typechecks the example app.
+`pnpm demo` rebuilds the library from the current repo checkout, regenerates the demo client into `examples/demo-app/generated`, and typechecks the example app.
 
 ## Files
 
@@ -33,6 +33,7 @@ pnpm start
 ## Notes
 
 - The demo installs `@platformatic/kafka` because real Platformatic usage requires it.
+- The demo generates through the built local CLI in `../../dist/cli.cjs` instead of the installed `file:../..` dependency snapshot, so local source changes in this repo are reflected immediately without reinstalling the demo app.
 - The demo does not connect to a live broker. It uses mock objects that implement the `send` and `consume` methods expected by the Platformatic adapter.
 - To move from the demo to a real application, replace the mocked producer and consumer with real `Producer` and `Consumer` instances from `@platformatic/kafka`.
 

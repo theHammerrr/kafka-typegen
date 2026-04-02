@@ -29,7 +29,13 @@ const topicConfigSchema = z.object({
 });
 
 export const kafkaTypegenConfigSchema = z.object({
-  generation: z.object({ clientName: nonEmptyStringSchema.optional(), typesFileName: nonEmptyStringSchema.optional() }).optional(),
+  generation: z
+    .object({
+      clientName: nonEmptyStringSchema.optional(),
+      packageName: nonEmptyStringSchema.optional(),
+      typesFileName: nonEmptyStringSchema.optional()
+    })
+    .optional(),
   naming: z.object({ eventTypeSuffix: nonEmptyStringSchema.optional(), topicTypeSuffix: nonEmptyStringSchema.optional() }).optional(),
   outputDir: nonEmptyStringSchema,
   runtime: z.object({ module: nonEmptyStringSchema.optional(), transport: runtimeTransportSchema.optional() }).optional(),

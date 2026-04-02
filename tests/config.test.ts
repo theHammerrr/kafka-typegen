@@ -255,6 +255,7 @@ describe('config normalization', () => {
     const normalized = resolveConfig({
       generation: {
         clientName: 'AppClient',
+        packageName: '@acme/generated-kafka',
         typesFileName: 'types.ts'
       },
       naming: {
@@ -313,6 +314,7 @@ describe('config normalization', () => {
     expect(normalized.resolvedOutputDir).toBe(resolvePath('./generated'));
     expect(normalized.generation).toEqual({
       clientName: 'AppClient',
+      packageName: '@acme/generated-kafka',
       typesFileName: 'types.ts'
     });
     expect(normalized.naming).toEqual({

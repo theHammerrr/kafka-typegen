@@ -83,6 +83,7 @@ out
 dist
 examples/demo-app/dist
 examples/demo-app/generated
+examples/demo-app/src/generated
 
 # Gatsby files
 .cache/

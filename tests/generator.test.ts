@@ -12,17 +12,15 @@ import {
 const schemaFixturesDir = resolvePath('tests', 'fixtures', 'schemas');
 const generatedFixturesDir = resolvePath('tests', 'fixtures', 'generated');
 
-async function buildGeneratedContents(configInput: Parameters<typeof resolveConfig>[0]): Promise<string> {
+async function buildGeneratedOutput(configInput: Parameters<typeof resolveConfig>[0]) {
   const config = resolveConfig(configInput);
   const catalog = await createCatalogBuilder().build(config);
-  const output = await createTypeGenerator().generate(catalog);
-
-  return output.files[0]?.contents ?? '';
+  return createTypeGenerator().generate(catalog);
 }
 
 describe('type generation', () => {
   it('matches the single-event generated output', async () => {
-    const contents = await buildGeneratedContents({
+    const output = await buildGeneratedOutput({
       outputDir: './generated',
       sources: {
         rootDir: schemaFixturesDir
@@ -39,14 +37,15 @@ describe('type generation', () => {
         }
       ]
     });
-
+    const contents = output.files.find((file) => file.filePath === 'kafka-client.ts')?.contents ?? '';
     const expected = await readFile(resolvePath(generatedFixturesDir, 'single-event.ts'), 'utf8');
 
     expect(contents).toBe(expected);
+    expect(output.files.map((file) => file.filePath)).toEqual(['kafka-client.ts', 'index.ts']);
   });
 
   it('matches the multi-event generated output deterministically', async () => {
-    const contents = await buildGeneratedContents({
+    const output = await buildGeneratedOutput({
       outputDir: './generated',
       sources: {
         rootDir: schemaFixturesDir
@@ -72,9 +71,45 @@ describe('type generation', () => {
         }
       ]
     });
-
+    const contents = output.files.find((file) => file.filePath === 'kafka-client.ts')?.contents ?? '';
     const expected = await readFile(resolvePath(generatedFixturesDir, 'multi-event.ts'), 'utf8');
 
     expect(contents).toBe(expected);
+  });
+
+  it('emits a local package wrapper when packageName is configured', async () => {
+    const output = await buildGeneratedOutput({
+      generation: {
+        packageName: '@acme/generated-kafka'
+      },
+      outputDir: './generated',
+      sources: {
+        rootDir: schemaFixturesDir
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+
+    expect(output.files).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          contents: "export * from './kafka-client.js';\n",
+          filePath: 'index.ts'
+        }),
+        expect.objectContaining({
+          filePath: 'package.json'
+        })
+      ])
+    );
+    expect(output.files.find((file) => file.filePath === 'package.json')?.contents).toContain('"name": "@acme/generated-kafka"');
   });
 });

@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createCatalogBuilder,
+  createRuntimeConsumer,
   createRuntimeClient,
+  createRuntimeProducer,
   createSyncClients,
   createTypeGenerator,
   defineConfig,
@@ -21,7 +23,9 @@ import {
 describe('public entrypoint', () => {
   it('exposes the config helpers', () => {
     expect(createCatalogBuilder).toBeTypeOf('function');
+    expect(createRuntimeConsumer).toBeTypeOf('function');
     expect(createRuntimeClient).toBeTypeOf('function');
+    expect(createRuntimeProducer).toBeTypeOf('function');
     expect(createSyncClients).toBeTypeOf('function');
     expect(createTypeGenerator).toBeTypeOf('function');
     expect(defineConfig).toBeTypeOf('function');
@@ -78,7 +82,16 @@ describe('public entrypoint', () => {
     };
 
     expect(runtimeModule.createRuntimeClient).toBeTypeOf('function');
+    expect(runtimeModule.createRuntimeProducer).toBeTypeOf('function');
+    expect(runtimeModule.createRuntimeConsumer).toBeTypeOf('function');
+    expect(runtimeModule.createPlatformaticRuntimeClient).toBeTypeOf('function');
+    expect(runtimeModule.createPlatformaticRuntimeProducer).toBeTypeOf('function');
+    expect(runtimeModule.createPlatformaticRuntimeConsumer).toBeTypeOf('function');
+    expect(runtimeModule.createPlatformaticProducerTransport).toBeTypeOf('function');
+    expect(runtimeModule.createPlatformaticConsumerTransport).toBeTypeOf('function');
     expect(platformaticRuntimeModule.createPlatformaticRuntimeClient).toBeTypeOf('function');
+    expect(platformaticRuntimeModule.createPlatformaticRuntimeProducer).toBeTypeOf('function');
+    expect(platformaticRuntimeModule.createPlatformaticRuntimeConsumer).toBeTypeOf('function');
     expect(platformaticRuntimeModule.createPlatformaticProducerTransport).toBeTypeOf('function');
     expect(platformaticRuntimeModule.createPlatformaticConsumerTransport).toBeTypeOf('function');
     expect(packageJson.exports['./runtime']).toBeDefined();

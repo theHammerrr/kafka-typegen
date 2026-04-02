@@ -1,7 +1,13 @@
 export default {
-  outputDir: './generated',
+  outputDir: './src/generated/kafka',
   sources: {
     rootDir: './schemas'
+  },
+  generation: {
+    packageName: '@app/kafka'
+  },
+  runtime: {
+    transport: '@platformatic/kafka'
   },
   topics: [
     {

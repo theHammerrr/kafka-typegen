@@ -6,8 +6,10 @@ export function toConsumerMessage<TPayload>(
   payload: TPayload
 ): RuntimeConsumerMessage<TPayload> {
   return {
+    event: metadata.eventName,
     eventName: metadata.eventName,
     payload,
+    topic: metadata.topicName,
     topicName: metadata.topicName,
     ...(message.headers !== undefined ? { headers: message.headers } : {}),
     ...(message.key !== undefined ? { key: message.key } : {}),

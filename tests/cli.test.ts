@@ -78,7 +78,7 @@ describe('cli', () => {
     const generatedFile = await readFile(join(workspace, 'generated', 'kafka-client.ts'), 'utf8');
 
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain('Generated 1 file(s)');
+    expect(result.stdout).toContain('Generated 2 file(s)');
     expect(generatedFile).toContain('export interface UserCreatedPayload');
     expect(generatedFile).toContain('createClient');
   });

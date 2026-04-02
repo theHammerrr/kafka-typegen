@@ -7,8 +7,8 @@
   "type": "module",
   "scripts": {
     "build": "pnpm typecheck",
-    "demo": "pnpm generate && pnpm typecheck",
-    "generate": "pnpm kafka-typegen generate --config ./kafka-typegen.config.mjs",
+    "demo": "pnpm --dir ../.. build && pnpm generate && pnpm typecheck",
+    "generate": "kafka-typegen generate --config ./kafka-typegen.config.mjs",
     "start": "pnpm exec tsx ./src/main.ts",
     "typecheck": "pnpm exec tsc --project tsconfig.json --noEmit"
   },

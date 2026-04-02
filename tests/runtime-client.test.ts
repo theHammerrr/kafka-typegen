@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createCatalogBuilder,
+  createRuntimeConsumer,
   createRuntimeClient,
+  createRuntimeProducer,
   createTypeGenerator,
   resolveConfig,
   type RuntimeIncomingMessage,
@@ -18,10 +20,36 @@ type GeneratedClientModule = {
   createClient: (runtime: ReturnType<typeof createRuntimeClient>) => {
     producer: {
       send: (event: string, payload: unknown) => Promise<void>;
+      events: {
+        userCreated?: {
+          send: (payload: unknown) => Promise<void>;
+        };
+      };
     };
     consumer: {
       on: (event: string, handler: (message: unknown) => Promise<void> | void) => Promise<void>;
       onTopic: (topic: string, handler: (message: unknown) => Promise<void> | void) => Promise<void>;
+      events: {
+        userCreated?: {
+          on: (handler: (message: unknown) => Promise<void> | void) => Promise<void>;
+        };
+      };
+    };
+  };
+  createConsumer: (runtimeConsumer: ReturnType<typeof createRuntimeConsumer>) => {
+    on: (event: string, handler: (message: unknown) => Promise<void> | void) => Promise<void>;
+    events: {
+      userCreated: {
+        on: (handler: (message: unknown) => Promise<void> | void) => Promise<void>;
+      };
+    };
+  };
+  createProducer: (runtimeProducer: ReturnType<typeof createRuntimeProducer>) => {
+    send: (event: string, payload: unknown) => Promise<void>;
+    events: {
+      userCreated: {
+        send: (payload: unknown) => Promise<void>;
+      };
     };
   };
 };
@@ -200,6 +228,82 @@ describe('runtime client integration', () => {
           metadata: { role: 'admin' }
         },
         topicName: 'user.lifecycle'
+      })
+    ]);
+  });
+
+  it('supports producer-only and consumer-only runtime helpers', async () => {
+    const sentMessages: unknown[] = [];
+    const topicHandlers = new Map<string, (message: RuntimeIncomingMessage) => Promise<void> | void>();
+    const serialization: RuntimeSerializationHooks = {
+      async deserialize(_metadata, message) {
+        return JSON.parse(new TextDecoder().decode(message.value));
+      },
+      async serialize(_metadata, payload) {
+        return {
+          value: new TextEncoder().encode(JSON.stringify(payload))
+        };
+      }
+    };
+
+    const runtimeProducer = createRuntimeProducer({
+      producerTransport: {
+        async send(message) {
+          sentMessages.push(message);
+        }
+      },
+      serialization
+    });
+    const runtimeConsumer = createRuntimeConsumer({
+      consumerTransport: {
+        async onTopic(topicName, handler) {
+          topicHandlers.set(topicName, handler);
+        }
+      },
+      serialization
+    });
+
+    const generatedModule = await loadGeneratedClientModule({
+      outputDir: './generated',
+      sources: {
+        rootDir: schemaFixturesDir
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+
+    const producer = generatedModule.createProducer(runtimeProducer);
+
+    await producer.events.userCreated.send({ id: '7' });
+
+    const receivedMessages: unknown[] = [];
+    const consumer = generatedModule.createConsumer(runtimeConsumer);
+    await consumer.events.userCreated.on(async (message) => {
+      receivedMessages.push(message);
+    });
+
+    await topicHandlers.get('user.events')?.({
+      headers: {
+        'x-kafka-typegen-event': 'user.created'
+      },
+      topicName: 'user.events',
+      value: new TextEncoder().encode(JSON.stringify({ id: '7' }))
+    });
+
+    expect(sentMessages).toHaveLength(1);
+    expect(receivedMessages).toEqual([
+      expect.objectContaining({
+        eventName: 'user.created',
+        payload: { id: '7' }
       })
     ]);
   });
