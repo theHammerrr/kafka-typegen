@@ -84,6 +84,19 @@ If you want to use the first-party Platformatic adapter:
 pnpm add kafka-typegen @platformatic/kafka
 ```
 
+## Release Pipeline
+
+The repository includes `.github/workflows/publish.yml`, which runs on every push to `main` and:
+
+- installs dependencies
+- runs `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build`
+- rewrites the package version to a unique canary version like `0.1.0-main.<run>.<sha>`
+- publishes that build to npm with the `main` dist-tag
+
+This is intentionally a canary flow rather than a stable `latest` release flow. npm will not accept re-publishing the same version for every commit, so each `main` push must publish a unique prerelease version.
+
+To enable publishing, set the `NPM_TOKEN` GitHub Actions secret for the repository.
+
 ## Quick Start
 
 ### 1. Create a config file
@@ -379,6 +392,26 @@ kafka-typegen
 kafka-typegen generate --config ./kafka-typegen.config.mjs
 kafka-typegen sync --config ./kafka-typegen.config.mjs
 kafka-typegen sync --apply --target registry
+```
+
+## Demo App
+
+A standalone usage example lives in `examples/demo-app`. It is not part of the published library package because the package `files` list only ships `dist/`.
+
+The demo shows:
+
+- a local `kafka-typegen.config.mjs`
+- an Avro schema under `schemas/`
+- generated client output under `generated/`
+- a small application that uses `createPlatformaticRuntimeClient(...)` from `kafka-typegen/runtime/platformatic`
+
+Run it with:
+
+```bash
+cd examples/demo-app
+pnpm install
+pnpm demo
+pnpm start
 ```
 
 ## Package Exports

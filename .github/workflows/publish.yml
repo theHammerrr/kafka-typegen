@@ -1,0 +1,52 @@
+name: Publish
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          cache: pnpm
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify library
+        run: |
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+          pnpm build
+
+      - name: Prepare canary npm version
+        run: node ./scripts/prepare-canary-version.mjs
+        env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          GITHUB_SHA: ${{ github.sha }}
+
+      - name: Publish to npm
+        run: pnpm publish --no-git-checks --access public --tag main
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true

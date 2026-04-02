@@ -8,9 +8,15 @@ importers:
 
   .:
     dependencies:
+      avsc:
+        specifier: ^5.7.9
+        version: 5.7.9
       kafkajs:
         specifier: ^2.2.4
         version: 2.2.4
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       '@platformatic/kafka':
         specifier: 1.31.0
@@ -24,9 +30,6 @@ importers:
       '@typescript-eslint/parser':
         specifier: ^8.58.0
         version: 8.58.0(eslint@10.1.0)(typescript@5.9.3)
-      avsc:
-        specifier: ^5.7.9
-        version: 5.7.9
       eslint:
         specifier: ^10.1.0
         version: 10.1.0
@@ -39,9 +42,6 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@24.12.0)
-      zod:
-        specifier: ^4.3.6
-        version: 4.3.6
 
 packages:
 
