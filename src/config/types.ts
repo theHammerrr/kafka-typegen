@@ -74,6 +74,8 @@ export interface KafkaTypegenTopicConfig {
 
 export interface KafkaTypegenTopicSyncConfig {
   readonly cleanupPolicy?: 'compact' | 'compact,delete' | 'delete';
+  readonly compressionGzipLevel?: number;
+  readonly compressionLz4Level?: number;
   readonly compressionType?:
     | 'gzip'
     | 'lz4'
@@ -81,12 +83,37 @@ export interface KafkaTypegenTopicSyncConfig {
     | 'snappy'
     | 'uncompressed'
     | 'zstd';
+  readonly compressionZstdLevel?: number;
+  readonly deleteRetentionMs?: number;
+  readonly fileDeleteDelayMs?: number;
+  readonly flushMessages?: number;
+  readonly flushMs?: number;
+  readonly followerReplicationThrottledReplicas?: readonly string[] | string;
+  readonly indexIntervalBytes?: number;
+  readonly leaderReplicationThrottledReplicas?: readonly string[] | string;
+  readonly localRetentionBytes?: number;
+  readonly localRetentionMs?: number;
+  readonly maxCompactionLagMs?: number;
   readonly maxMessageBytes?: number;
+  readonly messageTimestampAfterMaxMs?: number;
+  readonly messageTimestampBeforeMaxMs?: number;
+  readonly messageTimestampType?: 'CreateTime' | 'LogAppendTime';
+  readonly minCleanableDirtyRatio?: number;
   readonly minCompactionLagMs?: number;
+  readonly minInSyncReplicas?: number;
   readonly partitions: number;
+  readonly preallocate?: boolean;
+  readonly remoteLogCopyDisable?: boolean;
+  readonly remoteLogDeleteOnDisable?: boolean;
+  readonly remoteStorageEnable?: boolean;
   readonly replicationFactor: number;
   readonly retentionBytes?: number;
   readonly retentionMs?: number;
+  readonly segmentBytes?: number;
+  readonly segmentIndexBytes?: number;
+  readonly segmentJitterMs?: number;
+  readonly segmentMs?: number;
+  readonly uncleanLeaderElectionEnable?: boolean;
 }
 
 export interface KafkaTypegenConfig {
@@ -166,6 +193,8 @@ export interface NormalizedTopicConfig {
 
 export interface NormalizedTopicSyncConfig {
   readonly cleanupPolicy?: 'compact' | 'compact,delete' | 'delete';
+  readonly compressionGzipLevel?: number;
+  readonly compressionLz4Level?: number;
   readonly compressionType?:
     | 'gzip'
     | 'lz4'
@@ -173,12 +202,37 @@ export interface NormalizedTopicSyncConfig {
     | 'snappy'
     | 'uncompressed'
     | 'zstd';
+  readonly compressionZstdLevel?: number;
+  readonly deleteRetentionMs?: number;
+  readonly fileDeleteDelayMs?: number;
+  readonly flushMessages?: number;
+  readonly flushMs?: number;
+  readonly followerReplicationThrottledReplicas?: readonly string[] | string;
+  readonly indexIntervalBytes?: number;
+  readonly leaderReplicationThrottledReplicas?: readonly string[] | string;
+  readonly localRetentionBytes?: number;
+  readonly localRetentionMs?: number;
+  readonly maxCompactionLagMs?: number;
   readonly maxMessageBytes?: number;
+  readonly messageTimestampAfterMaxMs?: number;
+  readonly messageTimestampBeforeMaxMs?: number;
+  readonly messageTimestampType?: 'CreateTime' | 'LogAppendTime';
+  readonly minCleanableDirtyRatio?: number;
   readonly minCompactionLagMs?: number;
+  readonly minInSyncReplicas?: number;
   readonly partitions: number;
+  readonly preallocate?: boolean;
+  readonly remoteLogCopyDisable?: boolean;
+  readonly remoteLogDeleteOnDisable?: boolean;
+  readonly remoteStorageEnable?: boolean;
   readonly replicationFactor: number;
   readonly retentionBytes?: number;
   readonly retentionMs?: number;
+  readonly segmentBytes?: number;
+  readonly segmentIndexBytes?: number;
+  readonly segmentJitterMs?: number;
+  readonly segmentMs?: number;
+  readonly uncleanLeaderElectionEnable?: boolean;
 }
 
 export interface NormalizedKafkaTypegenConfig {
