@@ -47,15 +47,13 @@ function normalizeTopic(
 
   return {
     events,
-    sync: {
-      configEntries: topic.sync?.configEntries ?? {},
-      partitions: topic.sync?.partitions ?? 1,
-      replicationFactor: topic.sync?.replicationFactor ?? 1
-    },
     topicName: topic.name,
     subjectStrategy,
     ...(topicKeySchemaPath !== undefined ? { keySchemaPath: topicKeySchemaPath } : {}),
-    ...(resolvedTopicKeySchemaPath !== undefined ? { resolvedKeySchemaPath: resolvedTopicKeySchemaPath } : {})
+    ...(resolvedTopicKeySchemaPath !== undefined
+      ? { resolvedKeySchemaPath: resolvedTopicKeySchemaPath }
+      : {}),
+    ...(topic.sync !== undefined ? { sync: topic.sync } : {})
   };
 }
 
@@ -88,7 +86,15 @@ export function normalizeConfig(config: KafkaTypegenConfig): NormalizedKafkaType
       ? { sync: normalizedSyncConfig }
       : {}),
     ...(config.schemaRegistry !== undefined
-      ? { schemaRegistry: { subjectStrategy: defaultSubjectStrategy, url: config.schemaRegistry.url } }
+      ? {
+          schemaRegistry: {
+            subjectStrategy: defaultSubjectStrategy,
+            url: config.schemaRegistry.url,
+            ...(config.schemaRegistry.auth !== undefined
+              ? { auth: config.schemaRegistry.auth }
+              : {})
+          }
+        }
       : {})
   };
 }

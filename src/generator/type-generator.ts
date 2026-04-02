@@ -3,7 +3,13 @@ import type { EventCatalog } from '../catalog/index.js';
 import { emitPayloadInterfaces, emitEventUnion, emitTopicUnion, emitEventPayloadMap, emitTopicEventsMap } from './catalog-sections.js';
 import { emitClientFactory, emitClientTypes } from './client-sections.js';
 import { emitConsumerFactory, emitConsumerTypes } from './consumer-sections.js';
-import { emitEventMetadataMap, emitProducerMetadataConstant, emitTopicMetadataConstant, emitTopicMetadataMap } from './metadata-sections.js';
+import {
+  emitEventMetadataMap,
+  emitProducerMetadataConstant,
+  emitSchemaRegistryConfigConstant,
+  emitTopicMetadataConstant,
+  emitTopicMetadataMap
+} from './metadata-sections.js';
 import { emitEventNameConstants, emitTopicNameConstants } from './name-sections.js';
 import { emitGeneratedIndexFile, emitGeneratedPackageFile } from './package-files.js';
 import { emitProducerFactory, emitProducerTypes } from './producer-sections.js';
@@ -19,6 +25,9 @@ function emitGeneratedFile(catalog: EventCatalog): GeneratedFile {
     emitTopicUnion(catalog),
     emitEventNameConstants(catalog),
     emitTopicNameConstants(catalog),
+    ...(catalog.config.schemaRegistry !== undefined
+      ? [emitSchemaRegistryConfigConstant(catalog) ?? '']
+      : []),
     emitEventPayloadMap(catalog),
     emitTopicEventsMap(catalog),
     emitEventMetadataMap(catalog),

@@ -141,7 +141,10 @@ describe('cli', () => {
         topics: [
           {
             name: 'user.events',
-            sync: { partitions: 2 },
+            sync: {
+              partitions: 2,
+              replicationFactor: 1
+            },
             events: [{ name: 'user.created', schemaPath: './user-created.avsc' }]
           }
         ]
@@ -182,6 +185,10 @@ describe('cli', () => {
         topics: [
           {
             name: 'user.events',
+            sync: {
+              partitions: 1,
+              replicationFactor: 1
+            },
             events: [{ name: 'user.created', schemaPath: './user-created.avsc' }]
           }
         ]

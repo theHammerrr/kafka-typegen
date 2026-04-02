@@ -23,8 +23,14 @@ function createConfig() {
         ],
         name: 'user.events',
         sync: {
+          cleanupPolicy: 'delete',
+          compressionType: 'lz4',
+          maxMessageBytes: 1048576,
+          minCompactionLagMs: 60000,
           partitions: 3,
-          replicationFactor: 2
+          replicationFactor: 2,
+          retentionBytes: 10485760,
+          retentionMs: 86400000
         }
       }
     ]
@@ -37,7 +43,14 @@ describe('sync planning', () => {
 
     expect(buildKafkaTopicPlan({ config, events: [], topics: [] })).toEqual([
       {
-        configEntries: {},
+        configEntries: {
+          'cleanup.policy': 'delete',
+          'compression.type': 'lz4',
+          'max.message.bytes': '1048576',
+          'min.compaction.lag.ms': '60000',
+          'retention.bytes': '10485760',
+          'retention.ms': '86400000'
+        },
         partitions: 3,
         replicationFactor: 2,
         topicName: 'user.events'

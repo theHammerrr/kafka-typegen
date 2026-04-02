@@ -112,4 +112,39 @@ describe('type generation', () => {
     );
     expect(output.files.find((file) => file.filePath === 'package.json')?.contents).toContain('"name": "@acme/generated-kafka"');
   });
+
+  it('emits a schema registry config constant with url only', async () => {
+    const output = await buildGeneratedOutput({
+      outputDir: './generated',
+      schemaRegistry: {
+        auth: {
+          password: 'secret-password',
+          username: 'registry-user'
+        },
+        url: 'http://localhost:8081'
+      },
+      sources: {
+        rootDir: schemaFixturesDir
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+
+    const contents =
+      output.files.find((file) => file.filePath === 'kafka-client.ts')
+        ?.contents ?? '';
+
+    expect(contents).toContain("export const SchemaRegistryConfig = {\n  url: 'http://localhost:8081'\n} as const;");
+    expect(contents).not.toContain('secret-password');
+    expect(contents).not.toContain('registry-user');
+  });
 });
