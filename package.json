@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Type-safe Kafka client generation from topic definitions and Avro schemas.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/theHammerrr/kafka-typegen"
+  },
   "type": "module",
   "bin": {
     "kafka-typegen": "./dist/cli.cjs"
