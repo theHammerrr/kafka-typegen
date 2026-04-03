@@ -7,7 +7,7 @@ function emitConsumerHelper(event: EventCatalog['events'][number]): string {
   const body = [
     'on(handler, options) {',
     indent(
-      `return runtimeOn(producerEventMetadata[${formatLiteral(event.eventName)}], handler, options);`
+      `return runtimeOn(producerEventMetadata[${formatLiteral(event.eventName)}], handler as never, options);`
     ),
     '}'
   ].join('\n');

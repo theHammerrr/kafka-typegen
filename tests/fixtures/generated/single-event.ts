@@ -171,7 +171,7 @@ export function createConsumer<TRuntimeConsumer extends RuntimeConsumer>(runtime
   consumer.events = {
     userCreated: {
       on(handler, options) {
-        return runtimeOn(producerEventMetadata['user.created'], handler, options);
+        return runtimeOn(producerEventMetadata['user.created'], handler as never, options);
       }
     }
   };

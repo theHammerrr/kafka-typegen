@@ -1,0 +1,5 @@
+{
+  "type": "record",
+  "name": "UserDeleted",
+  "fields": [{ "name": "id", "type": "string" }]
+}
