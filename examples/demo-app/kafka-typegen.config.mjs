@@ -5,9 +5,6 @@ export default defineConfig({
   sources: {
     rootDir: "./schemas",
   },
-  generation: {
-    packageName: "@app/kafka",
-  },
   runtime: {
     transport: "@platformatic/kafka",
   },

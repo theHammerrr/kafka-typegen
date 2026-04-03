@@ -283,6 +283,48 @@ describe('config validation', () => {
     ).toThrowError(ConfigValidationError);
   });
 
+  it('rejects removed generation options', () => {
+    expect(() =>
+      validateConfig({
+        generation: {
+          clientName: 'AppClient'
+        },
+        outputDir: './generated',
+        topics: [
+          {
+            events: [
+              {
+                name: 'user.created',
+                schemaPath: './schemas/user-created.avsc'
+              }
+            ],
+            name: 'user.events'
+          }
+        ]
+      })
+    ).toThrowError(ConfigValidationError);
+
+    expect(() =>
+      validateConfig({
+        generation: {
+          packageName: '@acme/generated-kafka'
+        },
+        outputDir: './generated',
+        topics: [
+          {
+            events: [
+              {
+                name: 'user.created',
+                schemaPath: './schemas/user-created.avsc'
+              }
+            ],
+            name: 'user.events'
+          }
+        ]
+      })
+    ).toThrowError(ConfigValidationError);
+  });
+
   it('requires topic sync config for every topic when kafka sync is enabled', () => {
     expect(() =>
       validateConfig({
@@ -336,8 +378,6 @@ describe('config normalization', () => {
   it('produces deterministic normalized output with derived metadata', () => {
     const normalized = resolveConfig({
       generation: {
-        clientName: 'AppClient',
-        packageName: '@acme/generated-kafka',
         typesFileName: 'types.ts'
       },
       naming: {
@@ -395,8 +435,6 @@ describe('config normalization', () => {
     expect(normalized.sources.rootDir).toBe(resolvePath('./fixtures'));
     expect(normalized.resolvedOutputDir).toBe(resolvePath('./generated'));
     expect(normalized.generation).toEqual({
-      clientName: 'AppClient',
-      packageName: '@acme/generated-kafka',
       typesFileName: 'types.ts'
     });
     expect(normalized.naming).toEqual({
