@@ -7,7 +7,7 @@ function emitConsumerHelper(event: EventCatalog['events'][number]): string {
   const body = [
     'on(handler, options) {',
     indent(
-      `return runtimeConsumer.on(producerEventMetadata[${formatLiteral(event.eventName)}], handler, options);`
+      `return runtimeOn(producerEventMetadata[${formatLiteral(event.eventName)}], handler, options);`
     ),
     '}'
   ].join('\n');
@@ -19,15 +19,17 @@ export function emitConsumerFactory(catalog: EventCatalog): string {
   const eventHelpers = catalog.events.map(emitConsumerHelper);
   const factoryBody = [
     'const consumer = Object.create(runtimeConsumer) as GeneratedConsumer<TRuntimeConsumer>;',
+    'const runtimeOn = runtimeConsumer.on.bind(runtimeConsumer);',
+    'const runtimeOnTopic = runtimeConsumer.onTopic.bind(runtimeConsumer);',
     '',
     'consumer.on = ((eventOrMetadata: unknown, handler: unknown, options?: unknown) => {',
     indent(
       [
         'if (typeof eventOrMetadata === \'string\' && Object.hasOwn(producerEventMetadata, eventOrMetadata)) {',
-        indent('return runtimeConsumer.on(producerEventMetadata[eventOrMetadata as EventName], handler as never, options as never);'),
+        indent('return runtimeOn(producerEventMetadata[eventOrMetadata as EventName], handler as never, options as never);'),
         '}',
         '',
-        'return runtimeConsumer.on(eventOrMetadata as never, handler as never, options as never);'
+        'return runtimeOn(eventOrMetadata as never, handler as never, options as never);'
       ].join('\n')
     ),
     '}) as GeneratedConsumer<TRuntimeConsumer>[\'on\'];',
@@ -36,10 +38,10 @@ export function emitConsumerFactory(catalog: EventCatalog): string {
     indent(
       [
         'if (typeof topicOrName === \'string\' && Object.hasOwn(topicEventMetadata, topicOrName)) {',
-        indent('return runtimeConsumer.onTopic(topicOrName as TopicName, topicEventMetadata[topicOrName as TopicName], handlerOrMetadata as never, maybeHandler as never);'),
+        indent('return runtimeOnTopic(topicOrName as TopicName, topicEventMetadata[topicOrName as TopicName], handlerOrMetadata as never, maybeHandler as never);'),
         '}',
         '',
-        'return runtimeConsumer.onTopic(topicOrName as never, handlerOrMetadata as never, maybeHandler as never, maybeOptions as never);'
+        'return runtimeOnTopic(topicOrName as never, handlerOrMetadata as never, maybeHandler as never, maybeOptions as never);'
       ].join('\n')
     ),
     '}) as GeneratedConsumer<TRuntimeConsumer>[\'onTopic\'];',
