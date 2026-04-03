@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createCatalogBuilder,
+  createPlatformaticRuntimeProducer,
   createRuntimeConsumer,
   createRuntimeClient,
   createRuntimeProducer,
@@ -22,37 +23,73 @@ type GeneratedClientModule = {
       send: (event: string, payload: unknown) => Promise<void>;
       events: {
         userCreated?: {
-          send: (payload: unknown) => Promise<void>;
+          send: (payload: unknown, options?: unknown) => Promise<void>;
         };
       };
     };
     consumer: {
-      on: (event: string, handler: (message: unknown) => Promise<void> | void) => Promise<void>;
-      onTopic: (topic: string, handler: (message: unknown) => Promise<void> | void) => Promise<void>;
+      on: (
+        event: string,
+        handler: (message: unknown) => Promise<void> | void,
+        options?: unknown
+      ) => Promise<void>;
+      onTopic: (
+        topic: string,
+        handler: (message: unknown) => Promise<void> | void,
+        options?: unknown
+      ) => Promise<void>;
       events: {
         userCreated?: {
-          on: (handler: (message: unknown) => Promise<void> | void) => Promise<void>;
+          on: (
+            handler: (message: unknown) => Promise<void> | void,
+            options?: unknown
+          ) => Promise<void>;
         };
       };
     };
   };
-  createConsumer: (runtimeConsumer: ReturnType<typeof createRuntimeConsumer>) => {
-    on: (event: string, handler: (message: unknown) => Promise<void> | void) => Promise<void>;
+  createConsumer: (
+    runtimeConsumer: ReturnType<typeof createRuntimeConsumer>
+  ) => {
+    on: (
+      event: string,
+      handler: (message: unknown) => Promise<void> | void,
+      options?: unknown
+    ) => Promise<void>;
     events: {
       userCreated: {
-        on: (handler: (message: unknown) => Promise<void> | void) => Promise<void>;
+        on: (
+          handler: (message: unknown) => Promise<void> | void,
+          options?: unknown
+        ) => Promise<void>;
       };
     };
   };
   createProducer: (runtimeProducer: ReturnType<typeof createRuntimeProducer>) => {
-    send: (event: string, payload: unknown) => Promise<void>;
+    send: (event: string, payload: unknown, options?: unknown) => Promise<void>;
     events: {
       userCreated: {
-        send: (payload: unknown) => Promise<void>;
+        send: (payload: unknown, options?: unknown) => Promise<void>;
       };
     };
   };
 };
+
+class PrivateFieldProducer {
+  #closed = false;
+
+  public async send(): Promise<never> {
+    throw new Error('Not used in private-field native method binding test');
+  }
+
+  public close(): void {
+    this.#closed = true;
+  }
+
+  public isClosed(): boolean {
+    return this.#closed;
+  }
+}
 
 async function loadGeneratedClientModule(
   configInput: Parameters<typeof resolveConfig>[0]
@@ -306,5 +343,125 @@ describe('runtime client integration', () => {
         payload: { id: '7' }
       })
     ]);
+  });
+
+  it('forwards generated producer and consumer options to the runtime layer', async () => {
+    const sentOptions: unknown[] = [];
+    const subscribeOptions: unknown[] = [];
+    const topicHandlers = new Map<
+      string,
+      (message: RuntimeIncomingMessage) => Promise<void> | void
+    >();
+    const serialization: RuntimeSerializationHooks = {
+      async deserialize(_metadata, message) {
+        return JSON.parse(new TextDecoder().decode(message.value));
+      },
+      async serialize(_metadata, payload) {
+        return {
+          value: new TextEncoder().encode(JSON.stringify(payload))
+        };
+      }
+    };
+
+    const runtimeProducer = createRuntimeProducer({
+      producerTransport: {
+        async send(_message, options) {
+          sentOptions.push(options);
+        }
+      },
+      serialization
+    });
+    const runtimeConsumer = createRuntimeConsumer({
+      consumerTransport: {
+        async onTopic(topicName, handler, options) {
+          subscribeOptions.push({ options, topicName });
+          topicHandlers.set(topicName, handler);
+        }
+      },
+      serialization
+    });
+
+    const generatedModule = await loadGeneratedClientModule({
+      outputDir: './generated',
+      sources: {
+        rootDir: schemaFixturesDir
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+
+    const producer = generatedModule.createProducer(runtimeProducer);
+    await producer.send('user.created', { id: '11' }, { acks: -1 });
+    await producer.events.userCreated.send({ id: '12' }, { acks: 1 });
+
+    const consumer = generatedModule.createConsumer(runtimeConsumer);
+    await consumer.on('user.created', async () => {}, { autocommit: false });
+    await consumer.events.userCreated.on(async () => {}, { autocommit: true });
+
+    expect(sentOptions).toEqual([{ acks: -1 }, { acks: 1 }]);
+    expect(subscribeOptions).toEqual([
+      {
+        options: { autocommit: false },
+        topicName: 'user.events'
+      },
+      {
+        options: { autocommit: true },
+        topicName: 'user.events'
+      }
+    ]);
+  });
+
+  it('preserves private-field-backed native producer methods through generated wrappers', async () => {
+    const generatedModule = await loadGeneratedClientModule({
+      outputDir: './generated',
+      sources: {
+        rootDir: schemaFixturesDir
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+    const producerClient = new PrivateFieldProducer();
+    const runtimeProducer = createPlatformaticRuntimeProducer({
+      producer: producerClient,
+      serialization: {
+        async deserialize() {
+          throw new Error('Not used in native method binding test');
+        },
+        async serialize() {
+          return {
+            value: new Uint8Array()
+          };
+        }
+      }
+    });
+
+    const producer = generatedModule.createProducer(
+      runtimeProducer as ReturnType<typeof createRuntimeProducer>
+    ) as ReturnType<typeof generatedModule.createProducer> & {
+      close(): void;
+      isClosed(): boolean;
+    };
+
+    producer.close();
+
+    expect(producer.isClosed()).toBe(true);
   });
 });

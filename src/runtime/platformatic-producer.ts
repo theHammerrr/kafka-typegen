@@ -2,16 +2,20 @@ import { Buffer } from 'node:buffer';
 
 import type { RuntimeTransportProducer } from './types.js';
 import { toPlatformaticHeaders } from './platformatic-headers.js';
-import type { PlatformaticProducerLike } from './platformatic-types.js';
+import type {
+  PlatformaticProducerLike,
+  PlatformaticProducerSendOptions
+} from './platformatic-types.js';
 
 export function createPlatformaticProducerTransport<TKey = Buffer>(
   producer: PlatformaticProducerLike<TKey>
-): RuntimeTransportProducer {
+): RuntimeTransportProducer<PlatformaticProducerSendOptions<TKey>> {
   return {
-    async send(message) {
+    async send(message, options) {
       const headers = toPlatformaticHeaders(message.headers);
 
       await producer.send({
+        ...(options ?? {}),
         messages: [
           {
             topic: message.topicName,

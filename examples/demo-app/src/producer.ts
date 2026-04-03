@@ -1,0 +1,37 @@
+import { Producer } from '@platformatic/kafka';
+import { createPlatformaticRuntimeProducer, } from 'kafka-typegen/runtime';
+import { createProducer } from './generated/kafka/kafka-client.js';
+
+
+const producer = async () => {
+    const producer = createProducer(
+        createPlatformaticRuntimeProducer({
+            producer: new Producer({
+                bootstrapBrokers: ['localhost:19092'],
+                clientId: 'demo-app',
+            }),
+            schemaRegistry: {
+                url: 'http://localhost:18081',
+            }
+        })
+    );
+
+    await producer.events.userCreated.send({
+        id: '123',
+        email: 'user@example.com',
+        isAdmin: false,
+    }, {
+        idempotent: true,
+    })
+
+    await producer.events.userDeleted.send({
+        id: '123',
+    })
+
+    await producer.close()
+}
+
+producer().catch((err) => {
+    console.error(err)
+    process.exit(1)
+})

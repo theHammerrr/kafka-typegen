@@ -98,40 +98,47 @@ export const topicEventMetadata: { readonly [K in TopicName]: Readonly<Record<st
   }
 };
 
-export interface GeneratedProducerEvents {
+export type GeneratedProducerSendOptions<TRuntimeProducer extends RuntimeProducer> = TRuntimeProducer extends RuntimeProducer<infer TSendOptions> ? TSendOptions : never;
+
+export interface GeneratedProducerEvents<TRuntimeProducer extends RuntimeProducer = RuntimeProducer> {
   userCreated: {
-    send(payload: UserCreatedPayload): Promise<void>;
+    send(payload: UserCreatedPayload, options?: GeneratedProducerSendOptions<TRuntimeProducer>): Promise<void>;
   };
   userUpdated: {
-    send(payload: UserUpdatedPayload): Promise<void>;
+    send(payload: UserUpdatedPayload, options?: GeneratedProducerSendOptions<TRuntimeProducer>): Promise<void>;
   };
 }
 
 export type GeneratedProducer<TRuntimeProducer extends RuntimeProducer = RuntimeProducer> = TRuntimeProducer & {
-  send<E extends EventName>(event: E, payload: EventPayloadByName[E]): Promise<void>;
-  events: GeneratedProducerEvents;
+  send<E extends EventName>(
+    event: E,
+    payload: EventPayloadByName[E],
+    options?: GeneratedProducerSendOptions<TRuntimeProducer>
+  ): Promise<void>;
+  events: GeneratedProducerEvents<TRuntimeProducer>;
 };
 
 export function createProducer<TRuntimeProducer extends RuntimeProducer>(runtimeProducer: TRuntimeProducer): GeneratedProducer<TRuntimeProducer> {
   const producer = Object.create(runtimeProducer) as GeneratedProducer<TRuntimeProducer>;
+  const runtimeSend = runtimeProducer.send.bind(runtimeProducer);
 
-  producer.send = ((eventOrMetadata: unknown, payload: unknown) => {
+  producer.send = ((eventOrMetadata: unknown, payload: unknown, options?: unknown) => {
     if (typeof eventOrMetadata === 'string' && Object.hasOwn(producerEventMetadata, eventOrMetadata)) {
-      return runtimeProducer.send(producerEventMetadata[eventOrMetadata as EventName], payload);
+      return runtimeSend(producerEventMetadata[eventOrMetadata as EventName], payload, options as never);
     }
 
-    return runtimeProducer.send(eventOrMetadata as never, payload as never);
+    return runtimeSend(eventOrMetadata as never, payload as never, options as never);
   }) as GeneratedProducer<TRuntimeProducer>['send'];
 
   producer.events = {
     userCreated: {
-      send(payload: UserCreatedPayload) {
-        return runtimeProducer.send(producerEventMetadata['user.created'], payload);
+      send(payload: UserCreatedPayload, options?: GeneratedProducerSendOptions<TRuntimeProducer>) {
+        return runtimeSend(producerEventMetadata['user.created'], payload, options);
       }
     },
     userUpdated: {
-      send(payload: UserUpdatedPayload) {
-        return runtimeProducer.send(producerEventMetadata['user.updated'], payload);
+      send(payload: UserUpdatedPayload, options?: GeneratedProducerSendOptions<TRuntimeProducer>) {
+        return runtimeSend(producerEventMetadata['user.updated'], payload, options);
       }
     }
   };
@@ -164,25 +171,29 @@ export interface UserUpdatedPayloadMessage {
 export type UserEventsTopicMessage = UserCreatedPayloadMessage;
 export type UserLifecycleTopicMessage = UserUpdatedPayloadMessage;
 
-export interface GeneratedConsumerEvents {
+export type GeneratedConsumerSubscribeOptions<TRuntimeConsumer extends RuntimeConsumer> = TRuntimeConsumer extends RuntimeConsumer<infer TSubscriptionOptions> ? TSubscriptionOptions : never;
+
+export interface GeneratedConsumerEvents<TRuntimeConsumer extends RuntimeConsumer = RuntimeConsumer> {
   userCreated: {
-    on(handler: (message: UserCreatedPayloadMessage) => Promise<void> | void): Promise<void>;
+    on(handler: (message: UserCreatedPayloadMessage) => Promise<void> | void, options?: GeneratedConsumerSubscribeOptions<TRuntimeConsumer>): Promise<void>;
   };
   userUpdated: {
-    on(handler: (message: UserUpdatedPayloadMessage) => Promise<void> | void): Promise<void>;
+    on(handler: (message: UserUpdatedPayloadMessage) => Promise<void> | void, options?: GeneratedConsumerSubscribeOptions<TRuntimeConsumer>): Promise<void>;
   };
 }
 
 export type GeneratedConsumer<TRuntimeConsumer extends RuntimeConsumer = RuntimeConsumer> = TRuntimeConsumer & {
   on<E extends EventName>(
     event: E,
-    handler: (message: ConsumerMessageByEvent[E]) => Promise<void> | void
+    handler: (message: ConsumerMessageByEvent[E]) => Promise<void> | void,
+    options?: GeneratedConsumerSubscribeOptions<TRuntimeConsumer>
   ): Promise<void>;
   onTopic<T extends TopicName>(
     topic: T,
-    handler: (message: ConsumerMessageByTopic[T]) => Promise<void> | void
+    handler: (message: ConsumerMessageByTopic[T]) => Promise<void> | void,
+    options?: GeneratedConsumerSubscribeOptions<TRuntimeConsumer>
   ): Promise<void>;
-  events: GeneratedConsumerEvents;
+  events: GeneratedConsumerEvents<TRuntimeConsumer>;
 };
 
 export interface ConsumerMessageByEvent {
@@ -197,32 +208,34 @@ export interface ConsumerMessageByTopic {
 
 export function createConsumer<TRuntimeConsumer extends RuntimeConsumer>(runtimeConsumer: TRuntimeConsumer): GeneratedConsumer<TRuntimeConsumer> {
   const consumer = Object.create(runtimeConsumer) as GeneratedConsumer<TRuntimeConsumer>;
+  const runtimeOn = runtimeConsumer.on.bind(runtimeConsumer);
+  const runtimeOnTopic = runtimeConsumer.onTopic.bind(runtimeConsumer);
 
-  consumer.on = ((eventOrMetadata: unknown, handler: unknown) => {
+  consumer.on = ((eventOrMetadata: unknown, handler: unknown, options?: unknown) => {
     if (typeof eventOrMetadata === 'string' && Object.hasOwn(producerEventMetadata, eventOrMetadata)) {
-      return runtimeConsumer.on(producerEventMetadata[eventOrMetadata as EventName], handler as never);
+      return runtimeOn(producerEventMetadata[eventOrMetadata as EventName], handler as never, options as never);
     }
 
-    return runtimeConsumer.on(eventOrMetadata as never, handler as never);
+    return runtimeOn(eventOrMetadata as never, handler as never, options as never);
   }) as GeneratedConsumer<TRuntimeConsumer>['on'];
 
-  consumer.onTopic = ((topicOrName: unknown, handlerOrMetadata: unknown, maybeHandler?: unknown) => {
+  consumer.onTopic = ((topicOrName: unknown, handlerOrMetadata: unknown, maybeHandler?: unknown, maybeOptions?: unknown) => {
     if (typeof topicOrName === 'string' && Object.hasOwn(topicEventMetadata, topicOrName)) {
-      return runtimeConsumer.onTopic(topicOrName as TopicName, topicEventMetadata[topicOrName as TopicName], handlerOrMetadata as never);
+      return runtimeOnTopic(topicOrName as TopicName, topicEventMetadata[topicOrName as TopicName], handlerOrMetadata as never, maybeHandler as never);
     }
 
-    return runtimeConsumer.onTopic(topicOrName as never, handlerOrMetadata as never, maybeHandler as never);
+    return runtimeOnTopic(topicOrName as never, handlerOrMetadata as never, maybeHandler as never, maybeOptions as never);
   }) as GeneratedConsumer<TRuntimeConsumer>['onTopic'];
 
   consumer.events = {
     userCreated: {
-      on(handler) {
-        return runtimeConsumer.on(producerEventMetadata['user.created'], handler);
+      on(handler, options) {
+        return runtimeOn(producerEventMetadata['user.created'], handler as never, options);
       }
     },
     userUpdated: {
-      on(handler) {
-        return runtimeConsumer.on(producerEventMetadata['user.updated'], handler);
+      on(handler, options) {
+        return runtimeOn(producerEventMetadata['user.updated'], handler as never, options);
       }
     }
   };

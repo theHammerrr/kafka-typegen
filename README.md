@@ -78,6 +78,7 @@ That generated module gives you:
 - `consumer.on('user.created', handler)`
 - `consumer.events.userCreated.on(handler)`
 - `consumer.onTopic('user.events', handler)`
+- optional native transport options as the last argument, for example `producer.events.userCreated.send(payload, { acks: -1 })` and `consumer.onTopic('user.events', handler, { autocommit: false })`
 - `EventNames.UserCreated`
 - `TopicNames.UserEvents`
 - `createClient(runtime)` to bind producer and consumer together
@@ -245,6 +246,11 @@ interface KafkaTypegenConfig {
   };
   schemaRegistry?: {
     url: string;
+    auth?: {
+      username?: string;
+      password?: string;
+      token?: string;
+    };
     subjectStrategy?: 'event-name' | 'topic-name' | 'topic-event';
   };
   runtime?: {
@@ -264,9 +270,6 @@ interface KafkaTypegenConfig {
       failOnDrift?: boolean;
     };
     schemaRegistry?: {
-      url?: string;
-      username?: string;
-      password?: string;
       failOnDrift?: boolean;
     };
   };
@@ -284,9 +287,20 @@ interface KafkaTypegenConfig {
     keySchemaPath?: string;
     subjectStrategy?: 'event-name' | 'topic-name' | 'topic-event';
     sync?: {
-      partitions?: number;
-      replicationFactor?: number;
-      configEntries?: Record<string, string>;
+      partitions: number;
+      replicationFactor: number;
+      cleanupPolicy?: 'delete' | 'compact' | 'compact,delete';
+      compressionType?:
+        | 'producer'
+        | 'uncompressed'
+        | 'gzip'
+        | 'snappy'
+        | 'lz4'
+        | 'zstd';
+      retentionMs?: number;
+      retentionBytes?: number;
+      maxMessageBytes?: number;
+      minCompactionLagMs?: number;
     };
     events: Array<{
       name: string;
@@ -309,8 +323,9 @@ interface KafkaTypegenConfig {
   - `@platformatic/kafka` defaults to `kafka-typegen/runtime/platformatic`
 - `generation.packageName`, when set, emits a local package wrapper so the generated client can be imported from a stable package path.
 - `sync.kafka` config is used only by the `sync` CLI command.
-- `sync.schemaRegistry.url` defaults to `schemaRegistry.url` when omitted.
-- Topic sync defaults are `partitions: 1`, `replicationFactor: 1`, and empty `configEntries`.
+- `schemaRegistry` is the single source of truth for Schema Registry connection details.
+- `sync.schemaRegistry` controls registry sync policy only.
+- If `sync.kafka` is configured, every topic must provide `sync.partitions` and `sync.replicationFactor`.
 
 ### Sync Config Example
 
@@ -320,7 +335,11 @@ import { defineConfig } from 'kafka-typegen';
 export default defineConfig({
   outputDir: './generated',
   schemaRegistry: {
-    url: process.env.SCHEMA_REGISTRY_URL
+    url: process.env.SCHEMA_REGISTRY_URL,
+    auth: {
+      username: process.env.SCHEMA_REGISTRY_USERNAME,
+      password: process.env.SCHEMA_REGISTRY_PASSWORD
+    }
   },
   sync: {
     kafka: {
@@ -328,8 +347,7 @@ export default defineConfig({
       clientId: 'kafka-typegen-sync'
     },
     schemaRegistry: {
-      username: process.env.SCHEMA_REGISTRY_USERNAME,
-      password: process.env.SCHEMA_REGISTRY_PASSWORD
+      failOnDrift: true
     }
   },
   sources: {
@@ -341,9 +359,8 @@ export default defineConfig({
       sync: {
         partitions: 3,
         replicationFactor: 2,
-        configEntries: {
-          'cleanup.policy': 'delete'
-        }
+        cleanupPolicy: 'delete',
+        retentionMs: 86_400_000
       },
       events: [
         {
@@ -489,12 +506,16 @@ Generic runtime example:
 
 ```ts
 import { createRuntimeClient } from 'kafka-typegen/runtime';
+import { SchemaRegistryConfig } from '@app/kafka';
 
 const runtime = createRuntimeClient({
   producerTransport,
   consumerTransport,
   schemaRegistry: {
-    url: 'http://localhost:8081'
+    ...SchemaRegistryConfig,
+    auth: {
+      token: process.env.SCHEMA_REGISTRY_TOKEN
+    }
   }
 });
 ```
@@ -504,7 +525,7 @@ Platformatic example:
 ```ts
 import { Consumer, Producer } from '@platformatic/kafka';
 import { createPlatformaticRuntimeClient } from 'kafka-typegen/runtime';
-import { createClient } from '@app/kafka';
+import { SchemaRegistryConfig, createClient } from '@app/kafka';
 
 const runtime = createPlatformaticRuntimeClient({
   producer: new Producer({
@@ -517,7 +538,11 @@ const runtime = createPlatformaticRuntimeClient({
     bootstrapBrokers: ['localhost:9092']
   }),
   schemaRegistry: {
-    url: 'http://localhost:8081'
+    ...SchemaRegistryConfig,
+    auth: {
+      username: process.env.SCHEMA_REGISTRY_USERNAME,
+      password: process.env.SCHEMA_REGISTRY_PASSWORD
+    }
   }
 });
 
@@ -569,6 +594,8 @@ await producer.events.userCreated.send({
   id: 'user_1',
   email: 'ada@example.com',
   isAdmin: true
+}, {
+  acks: -1
 });
 ```
 
@@ -577,9 +604,7 @@ The same helpers also support Schema Registry directly:
 ```ts
 const runtimeProducer = createRuntimeProducer({
   producerTransport,
-  schemaRegistry: {
-    url: 'http://localhost:8081'
-  }
+  schemaRegistry: SchemaRegistryConfig
 });
 ```
 Platformatic runtime:
@@ -619,7 +644,7 @@ And the consumer-only path works the same way:
 ```ts
 import { Consumer } from '@platformatic/kafka';
 import { createPlatformaticRuntimeConsumer } from 'kafka-typegen/runtime';
-import { createConsumer } from '@app/kafka';
+import { SchemaRegistryConfig, createConsumer } from '@app/kafka';
 
 const runtimeConsumer = createPlatformaticRuntimeConsumer({
   consumer: new Consumer({
@@ -627,14 +652,14 @@ const runtimeConsumer = createPlatformaticRuntimeConsumer({
     groupId: 'app-group',
     bootstrapBrokers: ['localhost:9092']
   }),
-  schemaRegistry: {
-    url: 'http://localhost:8081'
-  }
+  schemaRegistry: SchemaRegistryConfig
 });
 
 const consumer = createConsumer(runtimeConsumer);
 await consumer.events.userCreated.on(async (message) => {
   message.payload.isAdmin;
+}, {
+  autocommit: false
 });
 ```
 ## CLI

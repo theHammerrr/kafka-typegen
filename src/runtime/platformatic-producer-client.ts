@@ -1,6 +1,10 @@
+import { createPlatformaticClientProxy } from './platformatic-client-proxy.js';
 import { createRuntimeProducer } from './producer-client.js';
 import { createPlatformaticProducerTransport } from './platformatic-producer.js';
-import type { PlatformaticProducerLike } from './platformatic-types.js';
+import type {
+  PlatformaticProducerLike,
+  PlatformaticProducerSendOptions
+} from './platformatic-types.js';
 import type {
   RuntimeEventMetadata,
   RuntimeProducer,
@@ -13,7 +17,11 @@ type PlatformaticSendDelegate = (
 ) => Promise<unknown> | void;
 
 export type PlatformaticRuntimeProducer<TProducer = PlatformaticProducerLike> = TProducer &
-  RuntimeProducer;
+  RuntimeProducer<
+    TProducer extends PlatformaticProducerLike<infer TKey>
+      ? PlatformaticProducerSendOptions<TKey>
+      : never
+  >;
 
 export type PlatformaticRuntimeProducerOptions<
   TKey = unknown,
@@ -57,15 +65,23 @@ export function toPlatformaticRuntimeProducer<
   TProducer extends PlatformaticProducerLike<TKey> = PlatformaticProducerLike<TKey>
 >(
   producer: TProducer,
-  runtimeProducer: RuntimeProducer
+  runtimeProducer: RuntimeProducer<PlatformaticProducerSendOptions<TKey>>
 ): PlatformaticRuntimeProducer<TProducer> {
-  const client = Object.create(producer) as PlatformaticRuntimeProducer<TProducer>;
   const send = producer.send.bind(producer) as PlatformaticSendDelegate;
 
-  client.send = ((messageOrMetadata: unknown, payloadOrCallback?: unknown) =>
-    isRuntimeEventMetadata(messageOrMetadata)
-      ? runtimeProducer.send(messageOrMetadata, payloadOrCallback)
-      : send(messageOrMetadata, payloadOrCallback)) as PlatformaticRuntimeProducer<TProducer>['send'];
-
-  return client;
+  return createPlatformaticClientProxy(producer, {
+    send: ((
+      messageOrMetadata: unknown,
+      payloadOrCallback?: unknown,
+      sendOptions?: unknown
+    ) =>
+      isRuntimeEventMetadata(messageOrMetadata)
+        ? runtimeProducer.send(
+            messageOrMetadata,
+            payloadOrCallback,
+            sendOptions as never
+          )
+        : send(messageOrMetadata, payloadOrCallback)
+    ) as PlatformaticRuntimeProducer<TProducer>['send']
+  });
 }

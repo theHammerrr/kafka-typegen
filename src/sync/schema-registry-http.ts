@@ -5,8 +5,15 @@ import type { NormalizedSyncSchemaRegistryConfig } from '../config/index.js';
 export function buildSchemaRegistryHeaders(config: NormalizedSyncSchemaRegistryConfig): Record<string, string> {
   const headers: Record<string, string> = { Accept: 'application/json' };
 
-  if (config.username !== undefined && config.password !== undefined) {
-    headers.Authorization = `Basic ${Buffer.from(`${config.username}:${config.password}`).toString('base64')}`;
+  if (
+    config.auth?.username !== undefined &&
+    config.auth.password !== undefined
+  ) {
+    headers.Authorization = `Basic ${Buffer.from(
+      `${config.auth.username}:${config.auth.password}`
+    ).toString('base64')}`;
+  } else if (config.auth?.token !== undefined) {
+    headers.Authorization = `Bearer ${config.auth.token}`;
   }
 
   return headers;

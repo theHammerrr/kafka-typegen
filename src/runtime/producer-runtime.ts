@@ -7,10 +7,17 @@ import type {
 
 const RUNTIME_EVENT_HEADER = 'x-kafka-typegen-event';
 
-export class DefaultRuntimeProducer implements RuntimeProducer {
-  public constructor(private readonly options: ResolvedRuntimeClientOptions) {}
+export class DefaultRuntimeProducer<TSendOptions = unknown>
+  implements RuntimeProducer<TSendOptions> {
+  public constructor(
+    private readonly options: ResolvedRuntimeClientOptions<TSendOptions>
+  ) {}
 
-  public async send(metadata: RuntimeEventMetadata, payload: unknown): Promise<void> {
+  public async send(
+    metadata: RuntimeEventMetadata,
+    payload: unknown,
+    options?: TSendOptions
+  ): Promise<void> {
     const serialized = await this.options.serialization.serialize(metadata, payload);
 
     const outgoingMessage: RuntimeOutgoingMessage = {
@@ -21,7 +28,7 @@ export class DefaultRuntimeProducer implements RuntimeProducer {
       ...(serialized.schemaId !== undefined ? { schemaId: serialized.schemaId } : {})
     };
 
-    await this.options.producerTransport.send(outgoingMessage);
+    await this.options.producerTransport.send(outgoingMessage, options);
   }
 }
 

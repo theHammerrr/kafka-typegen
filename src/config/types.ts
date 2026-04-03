@@ -2,7 +2,14 @@ export type RuntimeTransport = '@platformatic/kafka' | 'kafkajs';
 
 export type SubjectNameStrategy = 'event-name' | 'topic-name' | 'topic-event';
 
+export interface KafkaTypegenSchemaRegistryAuthConfig {
+  readonly password?: string;
+  readonly token?: string;
+  readonly username?: string;
+}
+
 export interface KafkaTypegenSchemaRegistryConfig {
+  readonly auth?: KafkaTypegenSchemaRegistryAuthConfig;
   readonly url: string;
   readonly subjectStrategy?: SubjectNameStrategy;
 }
@@ -28,9 +35,6 @@ export interface KafkaTypegenSyncKafkaConfig {
 
 export interface KafkaTypegenSyncSchemaRegistryConfig {
   readonly failOnDrift?: boolean;
-  readonly password?: string;
-  readonly url?: string;
-  readonly username?: string;
 }
 
 export interface KafkaTypegenSyncConfig {
@@ -69,9 +73,47 @@ export interface KafkaTypegenTopicConfig {
 }
 
 export interface KafkaTypegenTopicSyncConfig {
-  readonly configEntries?: Readonly<Record<string, string>>;
-  readonly partitions?: number;
-  readonly replicationFactor?: number;
+  readonly cleanupPolicy?: 'compact' | 'compact,delete' | 'delete';
+  readonly compressionGzipLevel?: number;
+  readonly compressionLz4Level?: number;
+  readonly compressionType?:
+    | 'gzip'
+    | 'lz4'
+    | 'producer'
+    | 'snappy'
+    | 'uncompressed'
+    | 'zstd';
+  readonly compressionZstdLevel?: number;
+  readonly deleteRetentionMs?: number;
+  readonly fileDeleteDelayMs?: number;
+  readonly flushMessages?: number;
+  readonly flushMs?: number;
+  readonly followerReplicationThrottledReplicas?: readonly string[] | string;
+  readonly indexIntervalBytes?: number;
+  readonly leaderReplicationThrottledReplicas?: readonly string[] | string;
+  readonly localRetentionBytes?: number;
+  readonly localRetentionMs?: number;
+  readonly maxCompactionLagMs?: number;
+  readonly maxMessageBytes?: number;
+  readonly messageTimestampAfterMaxMs?: number;
+  readonly messageTimestampBeforeMaxMs?: number;
+  readonly messageTimestampType?: 'CreateTime' | 'LogAppendTime';
+  readonly minCleanableDirtyRatio?: number;
+  readonly minCompactionLagMs?: number;
+  readonly minInSyncReplicas?: number;
+  readonly partitions: number;
+  readonly preallocate?: boolean;
+  readonly remoteLogCopyDisable?: boolean;
+  readonly remoteLogDeleteOnDisable?: boolean;
+  readonly remoteStorageEnable?: boolean;
+  readonly replicationFactor: number;
+  readonly retentionBytes?: number;
+  readonly retentionMs?: number;
+  readonly segmentBytes?: number;
+  readonly segmentIndexBytes?: number;
+  readonly segmentJitterMs?: number;
+  readonly segmentMs?: number;
+  readonly uncleanLeaderElectionEnable?: boolean;
 }
 
 export interface KafkaTypegenConfig {
@@ -86,6 +128,7 @@ export interface KafkaTypegenConfig {
 }
 
 export interface NormalizedSchemaRegistryConfig {
+  readonly auth?: KafkaTypegenSchemaRegistryAuthConfig;
   readonly url: string;
   readonly subjectStrategy: SubjectNameStrategy;
 }
@@ -104,10 +147,9 @@ export interface NormalizedSyncKafkaConfig {
 }
 
 export interface NormalizedSyncSchemaRegistryConfig {
+  readonly auth?: KafkaTypegenSchemaRegistryAuthConfig;
   readonly failOnDrift: boolean;
-  readonly password?: string;
   readonly url: string;
-  readonly username?: string;
 }
 
 export interface NormalizedSyncConfig {
@@ -145,14 +187,52 @@ export interface NormalizedTopicConfig {
   readonly keySchemaPath?: string;
   readonly resolvedKeySchemaPath?: string;
   readonly subjectStrategy: SubjectNameStrategy;
-  readonly sync: NormalizedTopicSyncConfig;
+  readonly sync?: NormalizedTopicSyncConfig;
   readonly events: readonly NormalizedEventConfig[];
 }
 
 export interface NormalizedTopicSyncConfig {
-  readonly configEntries: Readonly<Record<string, string>>;
+  readonly cleanupPolicy?: 'compact' | 'compact,delete' | 'delete';
+  readonly compressionGzipLevel?: number;
+  readonly compressionLz4Level?: number;
+  readonly compressionType?:
+    | 'gzip'
+    | 'lz4'
+    | 'producer'
+    | 'snappy'
+    | 'uncompressed'
+    | 'zstd';
+  readonly compressionZstdLevel?: number;
+  readonly deleteRetentionMs?: number;
+  readonly fileDeleteDelayMs?: number;
+  readonly flushMessages?: number;
+  readonly flushMs?: number;
+  readonly followerReplicationThrottledReplicas?: readonly string[] | string;
+  readonly indexIntervalBytes?: number;
+  readonly leaderReplicationThrottledReplicas?: readonly string[] | string;
+  readonly localRetentionBytes?: number;
+  readonly localRetentionMs?: number;
+  readonly maxCompactionLagMs?: number;
+  readonly maxMessageBytes?: number;
+  readonly messageTimestampAfterMaxMs?: number;
+  readonly messageTimestampBeforeMaxMs?: number;
+  readonly messageTimestampType?: 'CreateTime' | 'LogAppendTime';
+  readonly minCleanableDirtyRatio?: number;
+  readonly minCompactionLagMs?: number;
+  readonly minInSyncReplicas?: number;
   readonly partitions: number;
+  readonly preallocate?: boolean;
+  readonly remoteLogCopyDisable?: boolean;
+  readonly remoteLogDeleteOnDisable?: boolean;
+  readonly remoteStorageEnable?: boolean;
   readonly replicationFactor: number;
+  readonly retentionBytes?: number;
+  readonly retentionMs?: number;
+  readonly segmentBytes?: number;
+  readonly segmentIndexBytes?: number;
+  readonly segmentJitterMs?: number;
+  readonly segmentMs?: number;
+  readonly uncleanLeaderElectionEnable?: boolean;
 }
 
 export interface NormalizedKafkaTypegenConfig {

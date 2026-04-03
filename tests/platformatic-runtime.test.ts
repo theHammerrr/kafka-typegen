@@ -89,20 +89,23 @@ describe('platformatic runtime adapter', () => {
       key: Buffer.from('user-1'),
       topicName: 'user.events',
       value: new Uint8Array([1, 2, 3])
+    }, {
+      acks: -1
     });
 
     expect(send).toHaveBeenCalledTimes(1);
     expect(send).toHaveBeenCalledWith({
       messages: [
         {
-          headers: {
-            'x-kafka-typegen-event': Buffer.from('user.created')
-          },
+          headers: new Map([
+            [Buffer.from('x-kafka-typegen-event'), Buffer.from('user.created')]
+          ]),
           key: Buffer.from('user-1'),
           topic: 'user.events',
           value: Buffer.from([1, 2, 3])
         }
-      ]
+      ],
+      acks: -1
     });
   });
 
@@ -121,7 +124,9 @@ describe('platformatic runtime adapter', () => {
     const handlerTwo = vi.fn().mockResolvedValue(undefined);
 
     await transport.onTopic('user.events', handlerOne);
-    await transport.onTopic('user.events', handlerTwo);
+    await transport.onTopic('user.events', handlerTwo, {
+      autocommit: false
+    });
 
     stream.emitData({
       headers: new Map([[Buffer.from('x-kafka-typegen-event'), Buffer.from('user.created')]]),
@@ -423,5 +428,76 @@ describe('platformatic runtime adapter', () => {
     expect(nativeOn).toHaveBeenCalledWith('consumer:error', expect.any(Function));
     expect(nativeOnResult).toBe('native-on-result');
     expect(runtimeClient.consumer.topics).toEqual(['user.events']);
+  });
+
+  it('forwards per-call platformatic producer and consumer options from runtime wrappers', async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const stream = new MockMessagesStream();
+    const consume = vi.fn().mockResolvedValue(stream);
+    const producer = createPlatformaticRuntimeProducer({
+      producer: { send },
+      serialization: {
+        async deserialize() {
+          throw new Error('Not used in producer option forwarding test');
+        },
+        async serialize(_metadata, payload) {
+          return {
+            value: Buffer.from(JSON.stringify(payload))
+          };
+        }
+      }
+    });
+    const consumer = createPlatformaticRuntimeConsumer({
+      consumer: { consume },
+      consumeOptions: {
+        autocommit: true
+      },
+      serialization: {
+        async deserialize(_metadata, message) {
+          return JSON.parse(Buffer.from(message.value).toString('utf8'));
+        },
+        async serialize() {
+          throw new Error('Not used in consumer option forwarding test');
+        }
+      }
+    });
+
+    await producer.send(
+      {
+        eventName: 'user.created',
+        payloadTypeName: 'UserCreatedPayload',
+        schemaFilePath: 'user-created.avsc',
+        schemaName: 'UserCreated',
+        subjectName: 'user.events-user.created',
+        topicName: 'user.events'
+      },
+      { id: '1' },
+      { acks: -1 }
+    );
+    await consumer.on(
+      {
+        eventName: 'user.created',
+        payloadTypeName: 'UserCreatedPayload',
+        schemaFilePath: 'user-created.avsc',
+        schemaName: 'UserCreated',
+        subjectName: 'user.events-user.created',
+        topicName: 'user.events'
+      },
+      async () => {},
+      { autocommit: false }
+    );
+
+    expect(send).toHaveBeenCalledWith({
+      acks: -1,
+      messages: [
+        expect.objectContaining({
+          topic: 'user.events'
+        })
+      ]
+    });
+    expect(consume).toHaveBeenCalledWith({
+      autocommit: false,
+      topics: ['user.events']
+    });
   });
 });
