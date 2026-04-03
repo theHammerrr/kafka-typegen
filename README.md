@@ -774,6 +774,15 @@ pnpm typecheck
 pnpm build
 ```
 
+For Docker-backed end-to-end coverage with real Kafka and Schema Registry:
+
+```bash
+pnpm build
+pnpm test:integration
+```
+
+`pnpm test:integration` requires a running Docker daemon. `pnpm test` stays fast and does not run the Testcontainers suite.
+
 ## Current Scope
 
 What this package does today:

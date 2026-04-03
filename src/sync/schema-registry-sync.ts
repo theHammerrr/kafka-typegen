@@ -1,8 +1,14 @@
+import avsc from 'avsc';
+import type { Schema } from 'avsc';
+
 import type { EventCatalog } from '../catalog/index.js';
 import type { NormalizedKafkaTypegenConfig } from '../config/index.js';
 
 import { buildSchemaRegistryPlan } from './schema-registry-plan.js';
+import { stableStringify } from './stable-stringify.js';
 import type { SchemaRegistryClient, SyncOperation } from './types.js';
+
+const { Type } = avsc;
 
 export async function executeSchemaRegistrySync(
   catalog: EventCatalog,
@@ -29,7 +35,7 @@ export async function executeSchemaRegistrySync(
       continue;
     }
 
-    if (existing.schemaText === subject.schemaText) {
+    if (normalizeSchemaText(existing.schemaText) === normalizeSchemaText(subject.schemaText)) {
       operations.push({
         action: 'noop',
         details: 'Subject already exists with matching schema.',
@@ -52,4 +58,13 @@ export async function executeSchemaRegistrySync(
   }
 
   return operations;
+}
+
+function normalizeSchemaText(schemaText: string): string {
+  try {
+    const schema = JSON.parse(schemaText) as Schema;
+    return stableStringify(Type.forSchema(schema).schema());
+  } catch {
+    return schemaText.trim();
+  }
 }

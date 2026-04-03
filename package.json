@@ -50,16 +50,19 @@
     "build": "tsup",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "clean": "powershell -Command \"if (Test-Path dist) { Remove-Item -Recurse -Force dist }\""
   },
   "devDependencies": {
     "@platformatic/kafka": "1.31.0",
+    "@testcontainers/kafka": "^11.13.0",
     "@types/node": "^24.0.0",
     "@typescript-eslint/eslint-plugin": "^8.58.0",
     "@typescript-eslint/parser": "^8.58.0",
     "eslint": "^10.1.0",
+    "testcontainers": "^11.13.0",
     "tsup": "^8.3.5",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
