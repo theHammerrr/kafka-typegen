@@ -60,6 +60,7 @@ export interface RuntimeProducer {
 }
 
 export interface RuntimeConsumerMessage<TPayload = unknown> {
+  readonly event: string;
   readonly eventName: string;
   readonly headers?: Readonly<Record<string, string>>;
   readonly key?: unknown;
@@ -68,6 +69,7 @@ export interface RuntimeConsumerMessage<TPayload = unknown> {
   readonly payload: TPayload;
   readonly schemaId?: string | number;
   readonly timestamp?: string;
+  readonly topic: string;
   readonly topicName: string;
 }
 

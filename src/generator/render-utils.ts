@@ -35,3 +35,9 @@ export function toCamelCase(value: string): string {
     ? `${pascalCaseValue.charAt(0).toLowerCase()}${pascalCaseValue.slice(1)}`
     : 'event';
 }
+
+export function toPascalCase(value: string): string {
+  const camelCaseValue = toCamelCase(value);
+
+  return `${camelCaseValue.charAt(0).toUpperCase()}${camelCaseValue.slice(1)}`;
+}

@@ -4,6 +4,8 @@ import { emitPayloadInterfaces, emitEventUnion, emitTopicUnion, emitEventPayload
 import { emitClientFactory, emitClientTypes } from './client-sections.js';
 import { emitConsumerFactory, emitConsumerTypes } from './consumer-sections.js';
 import { emitEventMetadataMap, emitProducerMetadataConstant, emitTopicMetadataConstant, emitTopicMetadataMap } from './metadata-sections.js';
+import { emitEventNameConstants, emitTopicNameConstants } from './name-sections.js';
+import { emitGeneratedIndexFile, emitGeneratedPackageFile } from './package-files.js';
 import { emitProducerFactory, emitProducerTypes } from './producer-sections.js';
 import { formatLiteral } from './render-utils.js';
 import type { GeneratedFile, GeneratorOutput, TypeGenerator } from './types.js';
@@ -15,6 +17,8 @@ function emitGeneratedFile(catalog: EventCatalog): GeneratedFile {
     emitPayloadInterfaces(catalog),
     emitEventUnion(catalog),
     emitTopicUnion(catalog),
+    emitEventNameConstants(catalog),
+    emitTopicNameConstants(catalog),
     emitEventPayloadMap(catalog),
     emitTopicEventsMap(catalog),
     emitEventMetadataMap(catalog),
@@ -37,8 +41,15 @@ function emitGeneratedFile(catalog: EventCatalog): GeneratedFile {
 
 export class DefaultTypeGenerator implements TypeGenerator {
   public async generate(catalog: EventCatalog): Promise<GeneratorOutput> {
+    const indexFile = emitGeneratedIndexFile(catalog);
+    const packageFile = emitGeneratedPackageFile(catalog);
+
     return {
-      files: [emitGeneratedFile(catalog)]
+      files: [
+        emitGeneratedFile(catalog),
+        ...(indexFile !== undefined ? [indexFile] : []),
+        ...(packageFile !== undefined ? [packageFile] : [])
+      ]
     };
   }
 }

@@ -58,6 +58,14 @@ export interface UserCreatedPayload {
 export type EventName = 'user.created';
 export type TopicName = 'user.events';
 
+export const EventNames = {
+  UserCreated: 'user.created'
+} as const;
+
+export const TopicNames = {
+  UserEvents: 'user.events'
+} as const;
+
 export function createProducer(runtimeProducer: RuntimeProducer) { /* ... */ }
 export function createConsumer(runtimeConsumer: RuntimeConsumer) { /* ... */ }
 export function createClient(runtime: RuntimeClient) { /* ... */ }
@@ -70,7 +78,61 @@ That generated module gives you:
 - `consumer.on('user.created', handler)`
 - `consumer.events.userCreated.on(handler)`
 - `consumer.onTopic('user.events', handler)`
+- `EventNames.UserCreated`
+- `TopicNames.UserEvents`
 - `createClient(runtime)` to bind producer and consumer together
+
+## Generated Import Ergonomics
+
+The generated client is still application-specific code, so it is not exported from the published `kafka-typegen` package itself. Instead, `kafka-typegen` can generate a small local package wrapper so your app imports the generated symbols from a stable package-like path.
+
+Configure a package name:
+
+```ts
+import { defineConfig } from 'kafka-typegen';
+
+export default defineConfig({
+  outputDir: './src/generated/kafka',
+  generation: {
+    packageName: '@app/kafka'
+  },
+  sources: {
+    rootDir: './schemas'
+  },
+  topics: [
+    {
+      name: 'user.events',
+      events: [
+        {
+          name: 'user.created',
+          schemaPath: './user-created.avsc'
+        }
+      ]
+    }
+  ]
+});
+```
+
+With `generation.packageName` set, the generator emits:
+
+- your generated client file
+- an `index.ts` re-export file
+- a generated `package.json`
+
+That lets your application code import the generated API from one stable local package path:
+
+```ts
+import {
+  EventNames,
+  TopicNames,
+  createClient,
+  createProducer,
+  type EventName,
+  type TopicName
+} from '@app/kafka';
+```
+
+This is the closest equivalent to the Prisma-style experience in this package today: the library generates a local package for your app, rather than trying to ship app-specific types from `kafka-typegen` itself.
 
 ## Install
 
@@ -210,6 +272,7 @@ interface KafkaTypegenConfig {
   };
   generation?: {
     clientName?: string;
+    packageName?: string;
     typesFileName?: string;
   };
   naming?: {
@@ -244,6 +307,7 @@ interface KafkaTypegenConfig {
 - If `runtime.module` is omitted:
   - `kafkajs` defaults to `kafka-typegen/runtime`
   - `@platformatic/kafka` defaults to `kafka-typegen/runtime/platformatic`
+- `generation.packageName`, when set, emits a local package wrapper so the generated client can be imported from a stable package path.
 - `sync.kafka` config is used only by the `sync` CLI command.
 - `sync.schemaRegistry.url` defaults to `schemaRegistry.url` when omitted.
 - Topic sync defaults are `partitions: 1`, `replicationFactor: 1`, and empty `configEntries`.
@@ -313,20 +377,20 @@ You provide:
 
 ### Platformatic runtime
 
-Import from `kafka-typegen/runtime/platformatic` when you already have `@platformatic/kafka` producer and consumer instances:
+Platformatic helpers are available from both `kafka-typegen/runtime` and `kafka-typegen/runtime/platformatic`. The shorter import is supported:
 
 ```ts
 import { Producer, Consumer } from '@platformatic/kafka';
 import {
   createPlatformaticRuntimeClient
-} from 'kafka-typegen/runtime/platformatic';
+} from 'kafka-typegen/runtime';
 ```
 
 Example:
 
 ```ts
 import { Consumer, Producer } from '@platformatic/kafka';
-import { createPlatformaticRuntimeClient } from 'kafka-typegen/runtime/platformatic';
+import { createPlatformaticRuntimeClient } from 'kafka-typegen/runtime';
 import { createClient } from './generated/kafka-client.js';
 
 const producer = new Producer({
@@ -365,6 +429,78 @@ The Platformatic adapter:
 - creates at most one consume stream per topic
 - fans messages out to all registered handlers for that topic
 - does not manage producer, consumer, or stream shutdown for you
+
+`runtime.transport` in `kafka-typegen.config.mjs` is still useful even if you import Platformatic helpers manually. It controls which runtime module path the generated client uses for its type imports. If you omit it, generated code defaults to `kafka-typegen/runtime`; if you set `transport: '@platformatic/kafka'`, generated code defaults to `kafka-typegen/runtime/platformatic`.
+
+If you import from `kafka-typegen/runtime` directly, you can omit `runtime.transport` and keep an explicit `runtime.module` only when you want to override the generated import path.
+
+### Producer-only and consumer-only runtime helpers
+
+If your application only needs one side of the API, you do not need to build a full runtime client first.
+
+Generic runtime:
+
+```ts
+import { createRuntimeConsumer, createRuntimeProducer } from 'kafka-typegen/runtime';
+import { createConsumer, createProducer } from '@app/kafka';
+
+const runtimeProducer = createRuntimeProducer({
+  producerTransport: {
+    async send(message) {
+      // send to your transport
+    }
+  },
+  serialization: {
+    async serialize(_metadata, payload) {
+      return {
+        value: new TextEncoder().encode(JSON.stringify(payload))
+      };
+    },
+    async deserialize() {
+      throw new Error('Not used by producer-only runtime.');
+    }
+  }
+});
+
+const producer = createProducer(runtimeProducer);
+await producer.events.userCreated.send({
+  id: 'user_1',
+  email: 'ada@example.com',
+  isAdmin: true
+});
+```
+
+Platformatic runtime:
+
+```ts
+import { Producer } from '@platformatic/kafka';
+import { createPlatformaticRuntimeProducer } from 'kafka-typegen/runtime';
+import { createProducer } from '@app/kafka';
+
+const runtimeProducer = createPlatformaticRuntimeProducer({
+  producer: new Producer({
+    clientId: 'app-producer',
+    bootstrapBrokers: ['localhost:9092']
+  }),
+  serialization: {
+    async serialize(_metadata, payload) {
+      return {
+        value: new TextEncoder().encode(JSON.stringify(payload))
+      };
+    },
+    async deserialize() {
+      throw new Error('Not used by producer-only runtime.');
+    }
+  }
+});
+
+const producer = createProducer(runtimeProducer);
+await producer.events.userCreated.send({
+  id: 'user_1',
+  email: 'ada@example.com',
+  isAdmin: true
+});
+```
 
 ## CLI
 

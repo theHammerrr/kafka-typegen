@@ -1,4 +1,4 @@
-import { Type } from 'avsc';
+import avsc from 'avsc';
 import type { Schema } from 'avsc';
 
 import type { NormalizedEventConfig } from '../config/index.js';
@@ -8,6 +8,8 @@ import { normalizeField } from './field-format.js';
 import { FileSystemSchemaLoader } from './loader.js';
 import { toEventSchemaInput } from './event-input.js';
 import type { EventSchemaDefinition, EventSchemaInput, EventSchemaLoader, ParsedSchema, SchemaLoadResult, SchemaParser } from './types.js';
+
+const { Type } = avsc;
 
 function parseRecordSchema(result: SchemaLoadResult): Record<string, unknown> {
   let rawSchema: unknown;
