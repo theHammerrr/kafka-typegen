@@ -37,6 +37,10 @@ async function generateFromWorkspace(
   }
 }
 
+function normalizeLineEndings(value: string): string {
+  return value.replaceAll('\r\n', '\n');
+}
+
 afterEach(async () => {
   for (const tempDir of tempDirs.splice(0, tempDirs.length)) {
     await import('node:fs/promises').then(({ rm }) => rm(tempDir, { force: true, recursive: true }));
@@ -105,7 +109,7 @@ describe('end-to-end generation', () => {
     });
     const expected = await readFile(join('tests', 'fixtures', 'generated', 'multi-event.ts'), 'utf8');
 
-    expect(contents).toBe(expected);
+    expect(normalizeLineEndings(contents)).toBe(normalizeLineEndings(expected));
   });
 
   it('uses the platformatic runtime module when that transport is selected', async () => {

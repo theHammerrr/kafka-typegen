@@ -18,6 +18,10 @@ async function buildGeneratedOutput(configInput: Parameters<typeof resolveConfig
   return createTypeGenerator().generate(catalog);
 }
 
+function normalizeLineEndings(value: string): string {
+  return value.replaceAll('\r\n', '\n');
+}
+
 describe('type generation', () => {
   it('matches the single-event generated output', async () => {
     const output = await buildGeneratedOutput({
@@ -40,7 +44,7 @@ describe('type generation', () => {
     const contents = output.files.find((file) => file.filePath === 'kafka-client.ts')?.contents ?? '';
     const expected = await readFile(resolvePath(generatedFixturesDir, 'single-event.ts'), 'utf8');
 
-    expect(contents).toBe(expected);
+    expect(normalizeLineEndings(contents)).toBe(normalizeLineEndings(expected));
     expect(output.files.map((file) => file.filePath)).toEqual(['kafka-client.ts', 'index.ts']);
   });
 
@@ -74,7 +78,7 @@ describe('type generation', () => {
     const contents = output.files.find((file) => file.filePath === 'kafka-client.ts')?.contents ?? '';
     const expected = await readFile(resolvePath(generatedFixturesDir, 'multi-event.ts'), 'utf8');
 
-    expect(contents).toBe(expected);
+    expect(normalizeLineEndings(contents)).toBe(normalizeLineEndings(expected));
   });
 
   it('emits a local package wrapper when packageName is configured', async () => {
