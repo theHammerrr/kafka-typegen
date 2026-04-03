@@ -1,3 +1,4 @@
+import { createPlatformaticClientProxy } from './platformatic-client-proxy.js';
 import { createRuntimeConsumer } from './consumer-client.js';
 import { createPlatformaticConsumerTransport } from './platformatic-consumer.js';
 import type {
@@ -71,22 +72,24 @@ export function toPlatformaticRuntimeConsumer<
   consumer: TConsumer,
   runtimeConsumer: RuntimeConsumer<PlatformaticConsumerSubscribeOptions<TKey>>
 ): PlatformaticRuntimeConsumer<TConsumer> {
-  const client = Object.create(consumer) as PlatformaticRuntimeConsumer<TConsumer>;
   const nativeOn = (consumer as PlatformaticConsumerEventSource).on?.bind(consumer);
 
-  client.on = ((eventOrMetadata: unknown, handler: unknown, subscribeOptions?: unknown) =>
-    isRuntimeEventMetadata(eventOrMetadata)
-      ? runtimeConsumer.on(
-          eventOrMetadata,
-          handler as Parameters<RuntimeConsumer['on']>[1],
-          subscribeOptions as never
-        )
-      : nativeOn?.(
-          eventOrMetadata as string | symbol,
-          handler as (...args: unknown[]) => void
-        )) as PlatformaticRuntimeConsumer<TConsumer>['on'];
-
-  client.onTopic = runtimeConsumer.onTopic.bind(runtimeConsumer);
-
-  return client;
+  return createPlatformaticClientProxy(consumer, {
+    on: ((
+      eventOrMetadata: unknown,
+      handler: unknown,
+      subscribeOptions?: unknown
+    ) =>
+      isRuntimeEventMetadata(eventOrMetadata)
+        ? runtimeConsumer.on(
+            eventOrMetadata,
+            handler as Parameters<RuntimeConsumer['on']>[1],
+            subscribeOptions as never
+          )
+        : nativeOn?.(
+            eventOrMetadata as string | symbol,
+            handler as (...args: unknown[]) => void
+          )) as PlatformaticRuntimeConsumer<TConsumer>['on'],
+    onTopic: runtimeConsumer.onTopic.bind(runtimeConsumer)
+  });
 }
