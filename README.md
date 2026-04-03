@@ -582,7 +582,6 @@ const runtimeProducer = createRuntimeProducer({
   }
 });
 ```
-
 Platformatic runtime:
 
 ```ts
@@ -638,7 +637,6 @@ await consumer.events.userCreated.on(async (message) => {
   message.payload.isAdmin;
 });
 ```
-
 ## CLI
 
 The package exposes a CLI binary:
