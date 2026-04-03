@@ -84,6 +84,7 @@ describe('public entrypoint', () => {
     expect(runtimeModule.createRuntimeClient).toBeTypeOf('function');
     expect(runtimeModule.createRuntimeProducer).toBeTypeOf('function');
     expect(runtimeModule.createRuntimeConsumer).toBeTypeOf('function');
+    expect(runtimeModule.createConfluentSchemaRegistryRuntimeClient).toBeTypeOf('function');
     expect(runtimeModule.createPlatformaticRuntimeClient).toBeTypeOf('function');
     expect(runtimeModule.createPlatformaticRuntimeProducer).toBeTypeOf('function');
     expect(runtimeModule.createPlatformaticRuntimeConsumer).toBeTypeOf('function');

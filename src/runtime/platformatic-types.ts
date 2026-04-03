@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer';
 
 import type { ConsumeOptions, Consumer, Message, MessagesStream, Producer } from '@platformatic/kafka';
 
-import type { RuntimeSerializationHooks } from './types.js';
+import type { RuntimeSerializationOptions } from './types.js';
 
 export type PlatformaticProducerLike<TKey = unknown> = Pick<Producer<TKey, Buffer, string, Buffer>, 'send'>;
 export type PlatformaticConsumerLike<TKey = unknown> = Pick<Consumer<TKey, Buffer, Buffer, Buffer>, 'consume'>;
@@ -15,9 +15,8 @@ export interface PlatformaticConsumerTransportOptions<TKey = unknown> {
   readonly consumeOptions?: Omit<ConsumeOptions<TKey, Buffer, Buffer, Buffer>, 'topics'>;
 }
 
-export interface PlatformaticRuntimeClientOptions<TKey = unknown>
-  extends PlatformaticConsumerTransportOptions<TKey> {
+export type PlatformaticRuntimeClientOptions<TKey = unknown> = PlatformaticConsumerTransportOptions<TKey> &
+  RuntimeSerializationOptions & {
   readonly consumer: PlatformaticConsumerLike<TKey>;
   readonly producer: PlatformaticProducerLike<TKey>;
-  readonly serialization: RuntimeSerializationHooks;
-}
+};

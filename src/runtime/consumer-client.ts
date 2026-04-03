@@ -1,12 +1,13 @@
 import { DefaultRuntimeConsumer } from './consumer-runtime.js';
-import type { RuntimeClientOptions, RuntimeConsumer } from './types.js';
+import { resolveRuntimeSerialization } from './runtime-serialization.js';
+import type { RuntimeConsumer, RuntimeConsumerOptions } from './types.js';
 
-export function createRuntimeConsumer(options: Pick<RuntimeClientOptions, 'consumerTransport' | 'serialization'>): RuntimeConsumer {
+export function createRuntimeConsumer(options: RuntimeConsumerOptions): RuntimeConsumer {
   return new DefaultRuntimeConsumer({
     consumerTransport: options.consumerTransport,
     producerTransport: {
       async send() {}
     },
-    serialization: options.serialization
+    serialization: resolveRuntimeSerialization(options)
   });
 }

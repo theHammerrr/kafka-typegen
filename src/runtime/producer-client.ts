@@ -1,12 +1,13 @@
 import { DefaultRuntimeProducer } from './producer-runtime.js';
-import type { RuntimeClientOptions, RuntimeProducer } from './types.js';
+import { resolveRuntimeSerialization } from './runtime-serialization.js';
+import type { RuntimeProducer, RuntimeProducerOptions } from './types.js';
 
-export function createRuntimeProducer(options: Pick<RuntimeClientOptions, 'producerTransport' | 'serialization'>): RuntimeProducer {
+export function createRuntimeProducer(options: RuntimeProducerOptions): RuntimeProducer {
   return new DefaultRuntimeProducer({
     consumerTransport: {
       async onTopic() {}
     },
     producerTransport: options.producerTransport,
-    serialization: options.serialization
+    serialization: resolveRuntimeSerialization(options)
   });
 }

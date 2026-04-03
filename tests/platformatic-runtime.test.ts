@@ -1,14 +1,63 @@
 import { EventEmitter } from 'node:events';
+import { Buffer } from 'node:buffer';
 
+import avsc from 'avsc';
+import type { Schema } from 'avsc';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
   createPlatformaticConsumerTransport,
   createPlatformaticProducerTransport,
   createPlatformaticRuntimeClient,
+  createPlatformaticRuntimeConsumer,
+  createPlatformaticRuntimeProducer,
   type RuntimeIncomingMessage,
-  type RuntimeSerializationHooks
+  type RuntimeSerializationHooks,
+  type SchemaRegistryRuntimeClient
 } from '../src/runtime/platformatic.js';
+import {
+  decodeSchemaRegistryWireFormat,
+  encodeSchemaRegistryWireFormat
+} from '../src/runtime/schema-registry-wire-format.js';
+
+const { Type } = avsc;
+
+const userCreatedSchema = {
+  fields: [
+    { name: 'id', type: 'string' },
+    { name: 'email', type: 'string' },
+    { name: 'isAdmin', type: 'boolean' }
+  ],
+  name: 'UserCreated',
+  type: 'record'
+};
+const userCreatedSchemaText = JSON.stringify(userCreatedSchema);
+const userCreatedAvroType = Type.forSchema(userCreatedSchema as Schema);
+
+function createSchemaRegistryMock(): {
+  readonly getLatestSchema: ReturnType<typeof vi.fn>;
+  readonly getSchemaById: ReturnType<typeof vi.fn>;
+  readonly registry: SchemaRegistryRuntimeClient;
+} {
+  const getLatestSchema = vi.fn(async (subjectName: string) => ({
+    schema: userCreatedSchemaText,
+    schemaId: 7,
+    subjectName
+  }));
+  const getSchemaById = vi.fn(async (schemaId: number) => ({
+    schema: userCreatedSchemaText,
+    schemaId
+  }));
+
+  return {
+    getLatestSchema,
+    getSchemaById,
+    registry: {
+      getLatestSchema,
+      getSchemaById
+    }
+  };
+}
 
 class MockMessagesStream<TKey = unknown> extends EventEmitter {
   public emitData(message: {
@@ -155,5 +204,170 @@ describe('platformatic runtime adapter', () => {
     await Promise.resolve();
 
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('supports schema registry serialization through the platformatic runtime client', async () => {
+    const stream = new MockMessagesStream();
+    const send = vi.fn().mockResolvedValue(undefined);
+    const consume = vi.fn().mockResolvedValue(stream);
+    const { getLatestSchema, getSchemaById, registry } = createSchemaRegistryMock();
+    const client = createPlatformaticRuntimeClient({
+      consumer: {
+        consume
+      },
+      producer: {
+        send
+      },
+      schemaRegistry: registry
+    });
+    const handledMessages: unknown[] = [];
+
+    await client.consumer.on(
+      {
+        eventName: 'user.created',
+        payloadTypeName: 'UserCreatedPayload',
+        schemaFilePath: 'user-created.avsc',
+        schemaName: 'UserCreated',
+        subjectName: 'user.events-user.created',
+        topicName: 'user.events'
+      },
+      async (message) => {
+        handledMessages.push(message);
+      }
+    );
+    await client.producer.send(
+      {
+        eventName: 'user.created',
+        payloadTypeName: 'UserCreatedPayload',
+        schemaFilePath: 'user-created.avsc',
+        schemaName: 'UserCreated',
+        subjectName: 'user.events-user.created',
+        topicName: 'user.events'
+      },
+      {
+        email: 'ada@example.com',
+        id: 'user_1',
+        isAdmin: true
+      }
+    );
+
+    const producerPayload = send.mock.calls[0]?.[0]?.messages?.[0]?.value as Buffer;
+    stream.emitData({
+      headers: new Map([[Buffer.from('x-kafka-typegen-event'), Buffer.from('user.created')]]),
+      offset: 1n,
+      partition: 0,
+      timestamp: 2n,
+      topic: 'user.events',
+      value: producerPayload
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(getLatestSchema).toHaveBeenCalledTimes(1);
+    expect(getSchemaById).toHaveBeenCalledTimes(0);
+    expect(handledMessages).toEqual([
+      expect.objectContaining({
+        payload: {
+          email: 'ada@example.com',
+          id: 'user_1',
+          isAdmin: true
+        }
+      })
+    ]);
+  });
+
+  it('supports schema registry serialization through the platformatic producer-only helper', async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const { getLatestSchema, registry } = createSchemaRegistryMock();
+    const producer = createPlatformaticRuntimeProducer({
+      producer: {
+        send
+      },
+      schemaRegistry: registry
+    });
+
+    await producer.send(
+      {
+        eventName: 'user.created',
+        payloadTypeName: 'UserCreatedPayload',
+        schemaFilePath: 'user-created.avsc',
+        schemaName: 'UserCreated',
+        subjectName: 'user.events-user.created',
+        topicName: 'user.events'
+      },
+      {
+        email: 'grace@example.com',
+        id: 'user_2',
+        isAdmin: false
+      }
+    );
+
+    expect(getLatestSchema).toHaveBeenCalledTimes(1);
+    const encodedPayload = send.mock.calls[0]?.[0]?.messages?.[0]?.value as Buffer;
+    const decodedPayload = userCreatedAvroType.fromBuffer(
+      Buffer.from(decodeSchemaRegistryWireFormat(encodedPayload).payload)
+    );
+
+    expect(decodedPayload).toEqual({
+      email: 'grace@example.com',
+      id: 'user_2',
+      isAdmin: false
+    });
+  });
+
+  it('supports schema registry deserialization through the platformatic consumer-only helper', async () => {
+    const stream = new MockMessagesStream();
+    const consume = vi.fn().mockResolvedValue(stream);
+    const { getSchemaById, registry } = createSchemaRegistryMock();
+    const consumer = createPlatformaticRuntimeConsumer({
+      consumer: {
+        consume
+      },
+      schemaRegistry: registry
+    });
+    const handledMessages: unknown[] = [];
+
+    await consumer.on(
+      {
+        eventName: 'user.created',
+        payloadTypeName: 'UserCreatedPayload',
+        schemaFilePath: 'user-created.avsc',
+        schemaName: 'UserCreated',
+        subjectName: 'user.events-user.created',
+        topicName: 'user.events'
+      },
+      async (message) => {
+        handledMessages.push(message);
+      }
+    );
+
+    stream.emitData({
+      headers: new Map([[Buffer.from('x-kafka-typegen-event'), Buffer.from('user.created')]]),
+      offset: 1n,
+      partition: 0,
+      timestamp: 2n,
+      topic: 'user.events',
+      value: Buffer.from(
+        encodeSchemaRegistryWireFormat(
+          7,
+          userCreatedAvroType.toBuffer({
+            email: 'ada@example.com',
+            id: 'user_1',
+            isAdmin: true
+          })
+        )
+      )
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(getSchemaById).toHaveBeenCalledTimes(1);
+    expect(handledMessages).toEqual([
+      expect.objectContaining({
+        payload: {
+          email: 'ada@example.com',
+          id: 'user_1',
+          isAdmin: true
+        }
+      })
+    ]);
   });
 });

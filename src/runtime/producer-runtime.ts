@@ -1,9 +1,14 @@
-import type { RuntimeClientOptions, RuntimeEventMetadata, RuntimeOutgoingMessage, RuntimeProducer } from './types.js';
+import type {
+  ResolvedRuntimeClientOptions,
+  RuntimeEventMetadata,
+  RuntimeOutgoingMessage,
+  RuntimeProducer
+} from './types.js';
 
 const RUNTIME_EVENT_HEADER = 'x-kafka-typegen-event';
 
 export class DefaultRuntimeProducer implements RuntimeProducer {
-  public constructor(private readonly options: RuntimeClientOptions) {}
+  public constructor(private readonly options: ResolvedRuntimeClientOptions) {}
 
   public async send(metadata: RuntimeEventMetadata, payload: unknown): Promise<void> {
     const serialized = await this.options.serialization.serialize(metadata, payload);
