@@ -70,7 +70,9 @@ describe('end-to-end generation', () => {
     expect(contents).toContain("import type { RuntimeClient, RuntimeConsumer, RuntimeEventMetadata, RuntimeProducer } from '@acme/kafka-runtime';");
     expect(contents).toContain("export type EventName = 'user.created';");
     expect(contents).toContain("schemaFilePath: 'user-created.avsc';");
-    expect(contents).toContain('export function createClient(runtime: RuntimeClient): GeneratedClient {');
+    expect(contents).toContain(
+      'export function createClient<TRuntimeClient extends RuntimeClient>(runtime: TRuntimeClient): GeneratedClient<TRuntimeClient> {'
+    );
   });
 
   it('generates stable multi-event output across the full pipeline', async () => {
