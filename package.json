@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "kafka-typegen": "./dist/cli.js"
+    "kafka-typegen": "./dist/cli.cjs"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -55,15 +55,15 @@
     "@types/node": "^24.0.0",
     "@typescript-eslint/eslint-plugin": "^8.58.0",
     "@typescript-eslint/parser": "^8.58.0",
-    "avsc": "^5.7.9",
     "eslint": "^10.1.0",
     "tsup": "^8.3.5",
     "typescript": "^5.8.3",
-    "vitest": "^3.2.4",
-    "zod": "^4.3.6"
+    "vitest": "^3.2.4"
   },
   "packageManager": "pnpm@9.12.0+sha512.4abf725084d7bcbafbd728bfc7bee61f2f791f977fd87542b3579dcb23504d170d46337945e4c66485cd12d588a0c0e570ed9c477e7ccdd8507cf05f3f92eaca",
   "dependencies": {
-    "kafkajs": "^2.2.4"
+    "avsc": "^5.7.9",
+    "kafkajs": "^2.2.4",
+    "zod": "^4.3.6"
   }
 }

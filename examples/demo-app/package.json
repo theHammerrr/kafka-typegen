@@ -1,0 +1,24 @@
+{
+  "name": "kafka-typegen-demo-app",
+  "imports": {
+    "#generated-client": "./generated/kafka-client.ts"
+  },
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm typecheck",
+    "demo": "pnpm generate && pnpm typecheck",
+    "generate": "pnpm kafka-typegen generate --config ./kafka-typegen.config.mjs",
+    "start": "pnpm exec tsx ./src/main.ts",
+    "typecheck": "pnpm exec tsc --project tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@platformatic/kafka": "^1.31.0",
+    "kafka-typegen": "file:../.."
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.3"
+  }
+}
