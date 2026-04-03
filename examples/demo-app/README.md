@@ -1,11 +1,11 @@
 # Demo App
 
-This app lives outside the published library package and shows the shortest end-to-end usage path:
+This app lives outside the published library package and shows a real Platformatic-style usage path:
 
 1. generate a typed Kafka client from an Avro schema
-2. create a runtime with `kafka-typegen/runtime/platformatic`
-3. provide mock `@platformatic/kafka`-shaped producer and consumer objects
-3. send and consume a typed event through the generated client
+2. create a Platformatic runtime with `kafka-typegen/runtime`
+3. produce typed events with the generated producer
+4. consume typed events with the generated consumer
 
 ## Run It
 
@@ -16,10 +16,14 @@ pnpm install
 cd examples/demo-app
 pnpm install
 pnpm demo
-pnpm start
+pnpm consume
+# in another terminal
+pnpm produce
 ```
 
-`pnpm demo` rebuilds the library from the current repo checkout, regenerates the demo client into `examples/demo-app/generated`, and typechecks the example app.
+`pnpm demo` rebuilds the library from the current repo checkout, reinstalls the local `file:../..` package snapshot, regenerates the demo client into `examples/demo-app/src/generated/kafka`, and typechecks the example app.
+
+`pnpm consume` and `pnpm produce` expect Kafka and Schema Registry to be available at the endpoints configured in `kafka-typegen.config.mjs` and `src/producer.ts` / `src/consumer.ts`.
 
 ## Files
 
@@ -27,14 +31,17 @@ pnpm start
   - demo generator config
 - `schemas/user-created.avsc`
   - Avro schema used for code generation
-- `src/main.ts`
-  - example application code that wires the generated client to the Platformatic runtime adapter
+- `schemas/user-deleted.avsc`
+  - second Avro schema used to demonstrate multiple typed events on one topic
+- `src/producer.ts`
+  - example producer using `producer.events.userCreated.send(...)` and `producer.events.userDeleted.send(...)`
+- `src/consumer.ts`
+  - example consumer using `consumer.events.userCreated.on(...)` and `consumer.events.userDeleted.on(...)`
 
 ## Notes
 
 - The demo installs `@platformatic/kafka` because real Platformatic usage requires it.
-- The demo generates through the built local CLI in `../../dist/cli.cjs` instead of the installed `file:../..` dependency snapshot, so local source changes in this repo are reflected immediately without reinstalling the demo app.
-- The demo does not connect to a live broker. It uses mock objects that implement the `send` and `consume` methods expected by the Platformatic adapter.
-- To move from the demo to a real application, replace the mocked producer and consumer with real `Producer` and `Consumer` instances from `@platformatic/kafka`.
+- The demo uses the `kafka-typegen` CLI and runtime package like a normal consumer project.
+- Producer and consumer lifecycle is user-managed, so the examples call `producer.close()` and `consumer.close()` explicitly.
 
-The generated files are intentionally not committed. They are written to `generated/`, which is ignored by git.
+The generated files are intentionally not committed. They are written to `src/generated/kafka`, which is ignored by git.
