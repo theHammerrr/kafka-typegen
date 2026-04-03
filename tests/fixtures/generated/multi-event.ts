@@ -120,24 +120,25 @@ export type GeneratedProducer<TRuntimeProducer extends RuntimeProducer = Runtime
 
 export function createProducer<TRuntimeProducer extends RuntimeProducer>(runtimeProducer: TRuntimeProducer): GeneratedProducer<TRuntimeProducer> {
   const producer = Object.create(runtimeProducer) as GeneratedProducer<TRuntimeProducer>;
+  const runtimeSend = runtimeProducer.send.bind(runtimeProducer);
 
   producer.send = ((eventOrMetadata: unknown, payload: unknown, options?: unknown) => {
     if (typeof eventOrMetadata === 'string' && Object.hasOwn(producerEventMetadata, eventOrMetadata)) {
-      return runtimeProducer.send(producerEventMetadata[eventOrMetadata as EventName], payload, options as never);
+      return runtimeSend(producerEventMetadata[eventOrMetadata as EventName], payload, options as never);
     }
 
-    return runtimeProducer.send(eventOrMetadata as never, payload as never, options as never);
+    return runtimeSend(eventOrMetadata as never, payload as never, options as never);
   }) as GeneratedProducer<TRuntimeProducer>['send'];
 
   producer.events = {
     userCreated: {
       send(payload: UserCreatedPayload, options?: GeneratedProducerSendOptions<TRuntimeProducer>) {
-        return runtimeProducer.send(producerEventMetadata['user.created'], payload, options);
+        return runtimeSend(producerEventMetadata['user.created'], payload, options);
       }
     },
     userUpdated: {
       send(payload: UserUpdatedPayload, options?: GeneratedProducerSendOptions<TRuntimeProducer>) {
-        return runtimeProducer.send(producerEventMetadata['user.updated'], payload, options);
+        return runtimeSend(producerEventMetadata['user.updated'], payload, options);
       }
     }
   };
@@ -207,32 +208,34 @@ export interface ConsumerMessageByTopic {
 
 export function createConsumer<TRuntimeConsumer extends RuntimeConsumer>(runtimeConsumer: TRuntimeConsumer): GeneratedConsumer<TRuntimeConsumer> {
   const consumer = Object.create(runtimeConsumer) as GeneratedConsumer<TRuntimeConsumer>;
+  const runtimeOn = runtimeConsumer.on.bind(runtimeConsumer);
+  const runtimeOnTopic = runtimeConsumer.onTopic.bind(runtimeConsumer);
 
   consumer.on = ((eventOrMetadata: unknown, handler: unknown, options?: unknown) => {
     if (typeof eventOrMetadata === 'string' && Object.hasOwn(producerEventMetadata, eventOrMetadata)) {
-      return runtimeConsumer.on(producerEventMetadata[eventOrMetadata as EventName], handler as never, options as never);
+      return runtimeOn(producerEventMetadata[eventOrMetadata as EventName], handler as never, options as never);
     }
 
-    return runtimeConsumer.on(eventOrMetadata as never, handler as never, options as never);
+    return runtimeOn(eventOrMetadata as never, handler as never, options as never);
   }) as GeneratedConsumer<TRuntimeConsumer>['on'];
 
   consumer.onTopic = ((topicOrName: unknown, handlerOrMetadata: unknown, maybeHandler?: unknown, maybeOptions?: unknown) => {
     if (typeof topicOrName === 'string' && Object.hasOwn(topicEventMetadata, topicOrName)) {
-      return runtimeConsumer.onTopic(topicOrName as TopicName, topicEventMetadata[topicOrName as TopicName], handlerOrMetadata as never, maybeHandler as never);
+      return runtimeOnTopic(topicOrName as TopicName, topicEventMetadata[topicOrName as TopicName], handlerOrMetadata as never, maybeHandler as never);
     }
 
-    return runtimeConsumer.onTopic(topicOrName as never, handlerOrMetadata as never, maybeHandler as never, maybeOptions as never);
+    return runtimeOnTopic(topicOrName as never, handlerOrMetadata as never, maybeHandler as never, maybeOptions as never);
   }) as GeneratedConsumer<TRuntimeConsumer>['onTopic'];
 
   consumer.events = {
     userCreated: {
       on(handler, options) {
-        return runtimeConsumer.on(producerEventMetadata['user.created'], handler, options);
+        return runtimeOn(producerEventMetadata['user.created'], handler, options);
       }
     },
     userUpdated: {
       on(handler, options) {
-        return runtimeConsumer.on(producerEventMetadata['user.updated'], handler, options);
+        return runtimeOn(producerEventMetadata['user.updated'], handler, options);
       }
     }
   };

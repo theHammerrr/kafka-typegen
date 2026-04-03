@@ -37,7 +37,7 @@ export function emitProducerFactory(catalog: EventCatalog): string {
     const helperBody = [
       `send(payload: ${event.payloadTypeName}, options?: GeneratedProducerSendOptions<TRuntimeProducer>) {`,
       indent(
-        `return runtimeProducer.send(producerEventMetadata[${formatLiteral(event.eventName)}], payload, options);`
+        `return runtimeSend(producerEventMetadata[${formatLiteral(event.eventName)}], payload, options);`
       ),
       '}'
     ].join('\n');
@@ -47,17 +47,18 @@ export function emitProducerFactory(catalog: EventCatalog): string {
 
   const body = [
     'const producer = Object.create(runtimeProducer) as GeneratedProducer<TRuntimeProducer>;',
+    'const runtimeSend = runtimeProducer.send.bind(runtimeProducer);',
     '',
     'producer.send = ((eventOrMetadata: unknown, payload: unknown, options?: unknown) => {',
     indent(
       [
         'if (typeof eventOrMetadata === \'string\' && Object.hasOwn(producerEventMetadata, eventOrMetadata)) {',
         indent(
-          'return runtimeProducer.send(producerEventMetadata[eventOrMetadata as EventName], payload, options as never);'
+          'return runtimeSend(producerEventMetadata[eventOrMetadata as EventName], payload, options as never);'
         ),
         '}',
         '',
-        'return runtimeProducer.send(eventOrMetadata as never, payload as never, options as never);'
+        'return runtimeSend(eventOrMetadata as never, payload as never, options as never);'
       ].join('\n')
     ),
     '}) as GeneratedProducer<TRuntimeProducer>[\'send\'];',
