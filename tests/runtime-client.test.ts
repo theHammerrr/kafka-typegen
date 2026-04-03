@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createCatalogBuilder,
+  createPlatformaticRuntimeProducer,
   createRuntimeConsumer,
   createRuntimeClient,
   createRuntimeProducer,
@@ -73,6 +74,22 @@ type GeneratedClientModule = {
     };
   };
 };
+
+class PrivateFieldProducer {
+  #closed = false;
+
+  public async send(): Promise<never> {
+    throw new Error('Not used in private-field native method binding test');
+  }
+
+  public close(): void {
+    this.#closed = true;
+  }
+
+  public isClosed(): boolean {
+    return this.#closed;
+  }
+}
 
 async function loadGeneratedClientModule(
   configInput: Parameters<typeof resolveConfig>[0]
@@ -401,5 +418,50 @@ describe('runtime client integration', () => {
         topicName: 'user.events'
       }
     ]);
+  });
+
+  it('preserves private-field-backed native producer methods through generated wrappers', async () => {
+    const generatedModule = await loadGeneratedClientModule({
+      outputDir: './generated',
+      sources: {
+        rootDir: schemaFixturesDir
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+    const producerClient = new PrivateFieldProducer();
+    const runtimeProducer = createPlatformaticRuntimeProducer({
+      producer: producerClient,
+      serialization: {
+        async deserialize() {
+          throw new Error('Not used in native method binding test');
+        },
+        async serialize() {
+          return {
+            value: new Uint8Array()
+          };
+        }
+      }
+    });
+
+    const producer = generatedModule.createProducer(
+      runtimeProducer as ReturnType<typeof createRuntimeProducer>
+    ) as ReturnType<typeof generatedModule.createProducer> & {
+      close(): void;
+      isClosed(): boolean;
+    };
+
+    producer.close();
+
+    expect(producer.isClosed()).toBe(true);
   });
 });

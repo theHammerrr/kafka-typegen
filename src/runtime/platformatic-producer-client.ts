@@ -1,3 +1,4 @@
+import { createPlatformaticClientProxy } from './platformatic-client-proxy.js';
 import { createRuntimeProducer } from './producer-client.js';
 import { createPlatformaticProducerTransport } from './platformatic-producer.js';
 import type {
@@ -66,21 +67,21 @@ export function toPlatformaticRuntimeProducer<
   producer: TProducer,
   runtimeProducer: RuntimeProducer<PlatformaticProducerSendOptions<TKey>>
 ): PlatformaticRuntimeProducer<TProducer> {
-  const client = Object.create(producer) as PlatformaticRuntimeProducer<TProducer>;
   const send = producer.send.bind(producer) as PlatformaticSendDelegate;
 
-  client.send = ((
-    messageOrMetadata: unknown,
-    payloadOrCallback?: unknown,
-    sendOptions?: unknown
-  ) =>
-    isRuntimeEventMetadata(messageOrMetadata)
-      ? runtimeProducer.send(
-          messageOrMetadata,
-          payloadOrCallback,
-          sendOptions as never
-        )
-      : send(messageOrMetadata, payloadOrCallback)) as PlatformaticRuntimeProducer<TProducer>['send'];
-
-  return client;
+  return createPlatformaticClientProxy(producer, {
+    send: ((
+      messageOrMetadata: unknown,
+      payloadOrCallback?: unknown,
+      sendOptions?: unknown
+    ) =>
+      isRuntimeEventMetadata(messageOrMetadata)
+        ? runtimeProducer.send(
+            messageOrMetadata,
+            payloadOrCallback,
+            sendOptions as never
+          )
+        : send(messageOrMetadata, payloadOrCallback)
+    ) as PlatformaticRuntimeProducer<TProducer>['send']
+  });
 }
