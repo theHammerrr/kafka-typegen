@@ -164,7 +164,8 @@ describe('cli', () => {
             async getLatestSubject() {
               return undefined;
             },
-            async registerSubject() {}
+            async registerSubject() {},
+            async updateSubjectCompatibility() {}
           }
         };
       }

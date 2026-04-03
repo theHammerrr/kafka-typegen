@@ -1,6 +1,6 @@
 {
   "name": "kafka-typegen",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Type-safe Kafka client generation from topic definitions and Avro schemas.",
   "license": "MIT",
   "repository": {

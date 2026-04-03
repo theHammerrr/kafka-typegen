@@ -19,6 +19,20 @@ export const saslMechanismSchema = z.enum([
   'scram-sha-256',
   'scram-sha-512'
 ]);
+export const schemaRegistryCompatibilitySchema = z.enum([
+  'BACKWARD',
+  'BACKWARD_TRANSITIVE',
+  'FORWARD',
+  'FORWARD_TRANSITIVE',
+  'FULL',
+  'FULL_TRANSITIVE',
+  'NONE'
+]);
+export const schemaRegistryDriftActionSchema = z.enum([
+  'fail',
+  'ignore',
+  'register'
+]);
 const nonEmptyStringSchema = z.string().trim().min(1, 'Expected a non-empty string.');
 const throttledReplicasSchema = z.union([
   nonEmptyStringSchema,

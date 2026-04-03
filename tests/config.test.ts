@@ -95,6 +95,7 @@ describe('config validation', () => {
           brokers: ['localhost:9092']
         },
         schemaRegistry: {
+          compatibility: 'FULL',
           failOnDrift: true
         }
       },
@@ -372,6 +373,108 @@ describe('config validation', () => {
       })
     ).toThrowError(ConfigValidationError);
   });
+
+  it('accepts schema registry sync drift and compatibility policy', () => {
+    const config = defineConfig({
+      outputDir: './generated',
+      schemaRegistry: {
+        url: 'http://localhost:8081'
+      },
+      sync: {
+        schemaRegistry: {
+          compatibility: 'BACKWARD_TRANSITIVE',
+          onDrift: 'register'
+        }
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './schemas/user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    } satisfies KafkaTypegenConfig);
+
+    expect(validateConfig(config)).toEqual(config);
+  });
+
+  it('accepts every schema registry compatibility policy', () => {
+    const compatibilities = [
+      'BACKWARD',
+      'BACKWARD_TRANSITIVE',
+      'FORWARD',
+      'FORWARD_TRANSITIVE',
+      'FULL',
+      'FULL_TRANSITIVE',
+      'NONE'
+    ] as const;
+
+    for (const compatibility of compatibilities) {
+      expect(
+        validateConfig({
+          outputDir: './generated',
+          schemaRegistry: {
+            url: 'http://localhost:8081'
+          },
+          sync: {
+            schemaRegistry: {
+              compatibility,
+              onDrift: 'register'
+            }
+          },
+          topics: [
+            {
+              events: [
+                {
+                  name: 'user.created',
+                  schemaPath: './schemas/user-created.avsc'
+                }
+              ],
+              name: 'user.events'
+            }
+          ]
+        })
+      ).toMatchObject({
+        sync: {
+          schemaRegistry: {
+            compatibility
+          }
+        }
+      });
+    }
+  });
+
+  it('rejects schema registry configs that combine failOnDrift and onDrift', () => {
+    expect(() =>
+      validateConfig({
+        outputDir: './generated',
+        schemaRegistry: {
+          url: 'http://localhost:8081'
+        },
+        sync: {
+          schemaRegistry: {
+            failOnDrift: true,
+            onDrift: 'register'
+          }
+        },
+        topics: [
+          {
+            events: [
+              {
+                name: 'user.created',
+                schemaPath: './schemas/user-created.avsc'
+              }
+            ],
+            name: 'user.events'
+          }
+        ]
+      })
+    ).toThrowError(ConfigValidationError);
+  });
 });
 
 describe('config normalization', () => {
@@ -570,7 +673,7 @@ describe('config normalization', () => {
         auth: {
           token: 'registry-token'
         },
-        failOnDrift: false,
+        onDrift: 'register',
         url: 'http://localhost:8081'
       }
     });
@@ -595,6 +698,39 @@ describe('config normalization', () => {
       },
       sync: {
         schemaRegistry: {
+          compatibility: 'FORWARD',
+          onDrift: 'fail'
+        }
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './schemas/user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+
+    expect(normalized.sync?.schemaRegistry).toEqual({
+      compatibility: 'FORWARD',
+      onDrift: 'fail',
+      url: 'http://localhost:8081'
+    });
+    expect(normalized.topics[0]?.sync).toBeUndefined();
+  });
+
+  it('maps legacy sync.schemaRegistry.failOnDrift to onDrift fail', () => {
+    const normalized = resolveConfig({
+      outputDir: './generated',
+      schemaRegistry: {
+        url: 'http://localhost:8081'
+      },
+      sync: {
+        schemaRegistry: {
           failOnDrift: true
         }
       },
@@ -612,9 +748,8 @@ describe('config normalization', () => {
     });
 
     expect(normalized.sync?.schemaRegistry).toEqual({
-      failOnDrift: true,
+      onDrift: 'fail',
       url: 'http://localhost:8081'
     });
-    expect(normalized.topics[0]?.sync).toBeUndefined();
   });
 });

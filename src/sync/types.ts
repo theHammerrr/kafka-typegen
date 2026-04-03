@@ -1,8 +1,11 @@
 import type { EventCatalog } from '../catalog/index.js';
-import type { NormalizedKafkaTypegenConfig } from '../config/index.js';
+import type {
+  NormalizedKafkaTypegenConfig,
+  SchemaRegistryCompatibility
+} from '../config/index.js';
 
 export type SyncTarget = 'all' | 'kafka' | 'registry';
-export type SyncOperationAction = 'create' | 'drift' | 'noop';
+export type SyncOperationAction = 'create' | 'drift' | 'noop' | 'update';
 export type SyncOperationTarget = 'kafka' | 'registry';
 
 export interface DesiredKafkaTopic {
@@ -43,6 +46,10 @@ export interface KafkaAdminClient {
 export interface SchemaRegistryClient {
   getLatestSubject(subjectName: string): Promise<RemoteSchemaRegistrySubject | undefined>;
   registerSubject(subject: DesiredSchemaRegistrySubject): Promise<void>;
+  updateSubjectCompatibility(
+    subjectName: string,
+    compatibility: SchemaRegistryCompatibility
+  ): Promise<void>;
 }
 
 export interface SyncClients {

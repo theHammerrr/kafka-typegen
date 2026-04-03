@@ -3,7 +3,9 @@ import { z } from 'zod';
 import {
   createSchemaRegistryAuthSchema,
   createTopicSyncConfigSchema,
-  saslMechanismSchema
+  saslMechanismSchema,
+  schemaRegistryCompatibilitySchema,
+  schemaRegistryDriftActionSchema
 } from './sync-schemas.js';
 
 const nonEmptyStringSchema = z.string().trim().min(1, 'Expected a non-empty string.');
@@ -87,7 +89,9 @@ export const kafkaTypegenConfigSchema = z.object({
         .optional(),
       schemaRegistry: z
         .object({
-          failOnDrift: z.boolean().optional()
+          compatibility: schemaRegistryCompatibilitySchema.optional(),
+          failOnDrift: z.boolean().optional(),
+          onDrift: schemaRegistryDriftActionSchema.optional()
         })
         .strict()
         .optional()

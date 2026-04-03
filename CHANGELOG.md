@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## 0.2.0 - 2026-04-03
+
 ### Added
 
 - Documented the exact Avro schema constructs currently supported by the generator.
@@ -15,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `timestamp-micros`, and `decimal`.
 - Added a Docker-backed Testcontainers integration suite for real Kafka, Schema Registry, generated-app
   typechecking, runtime happy paths, and consumer error propagation.
+- Added Schema Registry schema-evolution support in `sync --apply`, including registering new subject
+  versions on drift and optional subject compatibility policy updates.
 
 ### Changed
 
@@ -23,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Generated imports are documented as direct relative imports from generated source files.
 - Schema Registry sync drift detection now compares canonicalized Avro schema definitions instead of raw
   JSON text.
+- `sync.schemaRegistry` now uses an explicit `onDrift` policy with default `register`; legacy
+  `failOnDrift: true` still maps to `onDrift: 'fail'`.
 
 ### Removed
 

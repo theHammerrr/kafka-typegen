@@ -148,6 +148,8 @@ describe('sync execution', () => {
         },
         async registerSubject(subject) {
           createdSubjects.push(subject.subjectName);
+        },
+        async updateSubjectCompatibility() {
         }
       }
     };
@@ -177,7 +179,8 @@ describe('sync execution', () => {
         async getLatestSubject(subjectName) {
           return { schemaText: '{}', subjectName };
         },
-        async registerSubject() {}
+        async registerSubject() {},
+        async updateSubjectCompatibility() {}
       }
     };
 
@@ -189,8 +192,188 @@ describe('sync execution', () => {
     expect(result.operations).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ action: 'drift', target: 'kafka' }),
-        expect.objectContaining({ action: 'drift', target: 'registry' })
+        expect.objectContaining({ action: 'update', target: 'registry' })
       ])
     );
+  });
+
+  it('registers a new subject version on schema drift during apply by default', async () => {
+    const { createCatalogBuilder } = await import('../src/catalog/index.js');
+    const config = createConfig();
+    const catalog = await createCatalogBuilder().build(config);
+    const registeredSubjects: string[] = [];
+    const clients: SyncClients = {
+      schemaRegistry: {
+        async getLatestSubject(subjectName) {
+          return { schemaText: '{}', subjectName };
+        },
+        async registerSubject(subject) {
+          registeredSubjects.push(subject.subjectName);
+        },
+        async updateSubjectCompatibility() {}
+      }
+    };
+
+    const result = await executeSync(
+      { catalog, config, options: { apply: true, json: false, target: 'registry' } },
+      { apply: true, clients, config, target: 'registry' }
+    );
+
+    expect(registeredSubjects).toEqual(['user.events-user.created']);
+    expect(result.operations).toEqual([
+      expect.objectContaining({ action: 'update', target: 'registry' })
+    ]);
+  });
+
+  it('fails on subject drift when schemaRegistry.onDrift is fail', async () => {
+    const { createCatalogBuilder } = await import('../src/catalog/index.js');
+    const config = resolveConfig({
+      outputDir: './generated',
+      schemaRegistry: {
+        url: 'http://localhost:8081'
+      },
+      sync: {
+        schemaRegistry: {
+          onDrift: 'fail'
+        }
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './tests/fixtures/schemas/user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+    const catalog = await createCatalogBuilder().build(config);
+    const clients: SyncClients = {
+      schemaRegistry: {
+        async getLatestSubject(subjectName) {
+          return { schemaText: '{}', subjectName };
+        },
+        async registerSubject() {},
+        async updateSubjectCompatibility() {}
+      }
+    };
+
+    await expect(
+      executeSync(
+        { catalog, config, options: { apply: false, json: false, target: 'registry' } },
+        { apply: false, clients, config, target: 'registry' }
+      )
+    ).rejects.toThrowError(
+      'Schema Registry sync detected subject drift and sync.schemaRegistry.onDrift is set to fail.'
+    );
+  });
+
+  it('reports subject drift without registering when schemaRegistry.onDrift is ignore', async () => {
+    const { createCatalogBuilder } = await import('../src/catalog/index.js');
+    const config = resolveConfig({
+      outputDir: './generated',
+      schemaRegistry: {
+        url: 'http://localhost:8081'
+      },
+      sync: {
+        schemaRegistry: {
+          onDrift: 'ignore'
+        }
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './tests/fixtures/schemas/user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+    const catalog = await createCatalogBuilder().build(config);
+    let registerCount = 0;
+    const clients: SyncClients = {
+      schemaRegistry: {
+        async getLatestSubject(subjectName) {
+          return { schemaText: '{}', subjectName };
+        },
+        async registerSubject() {
+          registerCount += 1;
+        },
+        async updateSubjectCompatibility() {}
+      }
+    };
+
+    const result = await executeSync(
+      { catalog, config, options: { apply: true, json: false, target: 'registry' } },
+      { apply: true, clients, config, target: 'registry' }
+    );
+
+    expect(registerCount).toBe(0);
+    expect(result.operations).toEqual([
+      expect.objectContaining({ action: 'drift', target: 'registry' })
+    ]);
+  });
+
+  it('applies configured subject compatibility before registering a new schema version', async () => {
+    const { createCatalogBuilder } = await import('../src/catalog/index.js');
+    const config = resolveConfig({
+      outputDir: './generated',
+      schemaRegistry: {
+        url: 'http://localhost:8081'
+      },
+      sync: {
+        schemaRegistry: {
+          compatibility: 'BACKWARD'
+        }
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './tests/fixtures/schemas/user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+    const catalog = await createCatalogBuilder().build(config);
+    const calls: string[] = [];
+    const clients: SyncClients = {
+      schemaRegistry: {
+        async getLatestSubject(subjectName) {
+          return { schemaText: '{}', subjectName };
+        },
+        async registerSubject(subject) {
+          calls.push(`register:${subject.subjectName}`);
+        },
+        async updateSubjectCompatibility(subjectName, compatibility) {
+          calls.push(`compatibility:${subjectName}:${compatibility}`);
+        }
+      }
+    };
+
+    const result = await executeSync(
+      { catalog, config, options: { apply: true, json: false, target: 'registry' } },
+      { apply: true, clients, config, target: 'registry' }
+    );
+
+    expect(calls).toEqual([
+      'compatibility:user.events-user.created:BACKWARD',
+      'register:user.events-user.created'
+    ]);
+    expect(result.operations).toEqual([
+      expect.objectContaining({
+        action: 'update',
+        details:
+          "Registered a new schema version for event 'user.created'. Compatibility BACKWARD was applied."
+      })
+    ]);
   });
 });
