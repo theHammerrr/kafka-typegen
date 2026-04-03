@@ -125,7 +125,7 @@ describe('platformatic runtime adapter', () => {
 
     await transport.onTopic('user.events', handlerOne);
     await transport.onTopic('user.events', handlerTwo, {
-      autocommit: false
+      autocommit: true
     });
 
     stream.emitData({
@@ -158,6 +158,66 @@ describe('platformatic runtime adapter', () => {
       value: Buffer.from([4, 5, 6])
     } satisfies RuntimeIncomingMessage);
     expect(handlerTwo).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects conflicting subscribe options for an already subscribed topic', async () => {
+    const stream = new MockMessagesStream();
+    const transport = createPlatformaticConsumerTransport(
+      {
+        consume: vi.fn().mockResolvedValue(stream)
+      },
+      {
+        consumeOptions: {
+          autocommit: true
+        }
+      }
+    );
+
+    await transport.onTopic('user.events', async () => {}, {
+      sessionTimeout: 30000
+    });
+
+    await expect(
+      transport.onTopic('user.events', async () => {}, {
+        autocommit: false,
+        sessionTimeout: 30000
+      })
+    ).rejects.toThrowError(
+      "Topic 'user.events' is already subscribed with different consume options."
+    );
+  });
+
+  it('reports stream errors and handler rejections through the configured callback', async () => {
+    const stream = new MockMessagesStream();
+    const onError = vi.fn();
+    const transport = createPlatformaticConsumerTransport(
+      {
+        consume: vi.fn().mockResolvedValue(stream)
+      },
+      { onError }
+    );
+
+    await transport.onTopic('user.events', async () => {
+      throw new Error('Handler failed.');
+    });
+
+    stream.emitData({
+      headers: new Map([[Buffer.from('x-kafka-typegen-event'), Buffer.from('user.created')]]),
+      offset: 5n,
+      partition: 2,
+      timestamp: 15n,
+      topic: 'user.events',
+      value: Buffer.from([4, 5, 6])
+    });
+    stream.emit('error', new Error('Stream failed.'));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Handler failed.'
+    }));
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Stream failed.'
+    }));
   });
 
   it('ignores unknown events in topic-based runtime client handlers', async () => {

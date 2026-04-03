@@ -25,12 +25,16 @@ export function emitGeneratedPackageFile(catalog: EventCatalog): GeneratedFile |
   return {
     contents: `${JSON.stringify(
       {
+        main: './index.ts',
         name: packageName,
         private: true,
         type: 'module',
         types: './index.ts',
         exports: {
-          '.': './index.ts'
+          '.': {
+            default: './index.ts',
+            types: './index.ts'
+          }
         }
       },
       null,

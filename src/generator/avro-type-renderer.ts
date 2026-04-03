@@ -1,5 +1,24 @@
 import { formatLiteral, formatPropertyName, indent } from './render-utils.js';
 
+const AVRO_PRIMITIVE_TYPES = new Set([
+  'boolean',
+  'bytes',
+  'double',
+  'float',
+  'int',
+  'long',
+  'null',
+  'string'
+]);
+
+function isNamedTypeReference(value: string): boolean {
+  return /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/u.test(value);
+}
+
+function renderNamedTypeReference(typeName: string): string {
+  return typeName.split('.').at(-1) ?? typeName;
+}
+
 export function toTypeScriptType(avroType: unknown): string {
   if (typeof avroType === 'string') {
     return renderPrimitiveType(avroType);
@@ -13,7 +32,9 @@ export function toTypeScriptType(avroType: unknown): string {
     return renderComplexType(avroType as Record<string, unknown>);
   }
 
-  return 'unknown';
+  throw new Error(
+    `Unsupported Avro type definition '${JSON.stringify(avroType)}'.`
+  );
 }
 
 function renderPrimitiveType(avroType: string): string {
@@ -32,7 +53,11 @@ function renderPrimitiveType(avroType: string): string {
     case 'string':
       return 'string';
     default:
-      return 'unknown';
+      if (isNamedTypeReference(avroType) && !AVRO_PRIMITIVE_TYPES.has(avroType)) {
+        return renderNamedTypeReference(avroType);
+      }
+
+      throw new Error(`Unsupported Avro type '${avroType}'.`);
   }
 }
 
@@ -55,7 +80,13 @@ function renderComplexType(typeRecord: Record<string, unknown>): string {
     case 'record':
       return renderInlineRecord(typeRecord);
     default:
-      return renderPrimitiveType(String(typeRecord.type));
+      if (typeof typeRecord.type === 'string') {
+        return renderPrimitiveType(typeRecord.type);
+      }
+
+      throw new Error(
+        `Unsupported Avro complex type '${JSON.stringify(typeRecord)}'.`
+      );
   }
 }
 
