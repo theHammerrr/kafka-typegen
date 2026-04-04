@@ -7,14 +7,18 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   createPlatformaticConsumerTransport,
-  createPlatformaticProducerTransport,
+  createPlatformaticProducerTransport
+} from '../src/runtime/advanced.js';
+import {
   createPlatformaticRuntimeClient,
   createPlatformaticRuntimeConsumer,
-  createPlatformaticRuntimeProducer,
-  type RuntimeIncomingMessage,
-  type RuntimeSerializationHooks,
-  type SchemaRegistryRuntimeClient
+  createPlatformaticRuntimeProducer
 } from '../src/runtime/platformatic.js';
+import type {
+  RuntimeIncomingMessage,
+  RuntimeSerializationHooks,
+  SchemaRegistryRuntimeClient
+} from '../src/runtime/index.js';
 import {
   decodeSchemaRegistryWireFormat,
   encodeSchemaRegistryWireFormat

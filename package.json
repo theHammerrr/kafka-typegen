@@ -25,6 +25,11 @@
       "import": "./dist/runtime/index.js",
       "require": "./dist/runtime/index.cjs"
     },
+    "./runtime/advanced": {
+      "types": "./dist/runtime/advanced.d.ts",
+      "import": "./dist/runtime/advanced.js",
+      "require": "./dist/runtime/advanced.cjs"
+    },
     "./runtime/platformatic": {
       "types": "./dist/runtime/platformatic.d.ts",
       "import": "./dist/runtime/platformatic.js",

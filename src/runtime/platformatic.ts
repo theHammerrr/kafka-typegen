@@ -1,18 +1,14 @@
 import { createRuntimeClient } from './client.js';
 export type {
-  SchemaRegistryRuntimeClient,
   RuntimeClient,
   RuntimeClientOptions,
   RuntimeConsumer,
   RuntimeConsumerMessage,
   RuntimeEventMetadata,
   RuntimeIncomingMessage,
-  RuntimeOutgoingMessage,
   RuntimeProducer,
   RuntimeSerializationHooks,
-  RuntimeSerializationResult,
-  RuntimeTransportConsumer,
-  RuntimeTransportProducer
+  RuntimeSerializationResult
 } from './types.js';
 import type { RuntimeClient, RuntimeClientOptions } from './types.js';
 import { createPlatformaticConsumerTransport } from './platformatic-consumer.js';
@@ -34,8 +30,6 @@ import type {
   PlatformaticRuntimeClientOptions
 } from './platformatic-types.js';
 
-export { createPlatformaticConsumerTransport } from './platformatic-consumer.js';
-export { createPlatformaticProducerTransport } from './platformatic-producer.js';
 export { createPlatformaticRuntimeConsumer } from './platformatic-consumer-client.js';
 export { createPlatformaticRuntimeProducer } from './platformatic-producer-client.js';
 

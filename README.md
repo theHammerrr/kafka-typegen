@@ -408,10 +408,14 @@ The generated client is transport-agnostic. It talks to a runtime interface, and
 
 ### Generic runtime
 
-Import from `kafka-typegen/runtime` when you want to provide your own transport adapters:
+Import from `kafka-typegen/runtime` for the runtime constructors, and from `kafka-typegen/runtime/advanced` for the low-level transport interfaces when you want to provide your own transport adapters:
 
 ```ts
 import { createRuntimeClient } from 'kafka-typegen/runtime';
+import type {
+  RuntimeTransportConsumer,
+  RuntimeTransportProducer
+} from 'kafka-typegen/runtime/advanced';
 ```
 
 You provide:
@@ -507,6 +511,13 @@ Recommended Avro evolution pattern:
 - To change optional to required, first ensure all producers always populate the field, then tighten the schema in a later version if your compatibility mode allows it.
 
 Schema Registry compatibility modes such as `BACKWARD` and `FULL` are enforced by Schema Registry itself. `kafka-typegen sync --apply` does not bypass those checks; it surfaces the registry error if a new schema version is rejected.
+
+Recommended compatibility policy:
+
+- Use `BACKWARD` for most Kafka event streams. That fits the common rollout order of deploying consumers first, then producers, and allows additive schema changes when new fields are nullable or have defaults.
+- Use `FULL` only when you need both old consumers and old producers to remain compatible across schema versions.
+- Avoid `NONE` outside local/dev experiments, because it allows breaking schema changes without protection.
+- If `sync.schemaRegistry.compatibility` is omitted, `kafka-typegen` does not change the subject policy and Schema Registry keeps its existing compatibility setting.
 
 For a given topic, repeated generated subscriptions must use the same consume options. Conflicting options are rejected instead of being ignored.
 
@@ -788,6 +799,9 @@ pnpm start
   - generic runtime interfaces
 - `kafka-typegen/runtime`
   - generic runtime client and runtime types
+- `kafka-typegen/runtime/advanced`
+  - low-level transport adapter interfaces
+  - Platformatic transport adapter builders
 - `kafka-typegen/runtime/platformatic`
   - Platformatic runtime adapter
   - generic runtime types re-exported for generated imports
