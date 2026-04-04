@@ -319,6 +319,78 @@ describe('sync execution', () => {
     ]);
   });
 
+  it('executes only the selected sync target', async () => {
+    const { createCatalogBuilder } = await import('../src/catalog/index.js');
+    const config = createConfig();
+    const catalog = await createCatalogBuilder().build(config);
+    let kafkaCalls = 0;
+    let registryCalls = 0;
+    const clients: SyncClients = {
+      kafkaAdmin: {
+        async createTopics() {
+          kafkaCalls += 1;
+        },
+        async listTopics() {
+          kafkaCalls += 1;
+          return [];
+        }
+      },
+      schemaRegistry: {
+        async getLatestSubject() {
+          registryCalls += 1;
+          return undefined;
+        },
+        async registerSubject() {
+          registryCalls += 1;
+        },
+        async updateSubjectCompatibility() {
+          registryCalls += 1;
+        }
+      }
+    };
+
+    const kafkaOnlyResult = await executeSync(
+      { catalog, config, options: { apply: false, json: false, target: 'kafka' } },
+      { apply: false, clients, config, target: 'kafka' }
+    );
+    expect(kafkaOnlyResult.operations).toEqual([
+      expect.objectContaining({ target: 'kafka' })
+    ]);
+    expect(kafkaCalls).toBeGreaterThan(0);
+    expect(registryCalls).toBe(0);
+
+    kafkaCalls = 0;
+    const registryOnlyResult = await executeSync(
+      { catalog, config, options: { apply: false, json: false, target: 'registry' } },
+      { apply: false, clients, config, target: 'registry' }
+    );
+    expect(registryOnlyResult.operations).toEqual([
+      expect.objectContaining({ target: 'registry' })
+    ]);
+    expect(kafkaCalls).toBe(0);
+    expect(registryCalls).toBeGreaterThan(0);
+  });
+
+  it('fails clearly when a selected sync target has no configured client', async () => {
+    const { createCatalogBuilder } = await import('../src/catalog/index.js');
+    const config = createConfig();
+    const catalog = await createCatalogBuilder().build(config);
+
+    await expect(
+      executeSync(
+        { catalog, config, options: { apply: false, json: false, target: 'kafka' } },
+        { apply: false, clients: {}, config, target: 'kafka' }
+      )
+    ).rejects.toThrowError('Kafka sync client is not configured.');
+
+    await expect(
+      executeSync(
+        { catalog, config, options: { apply: false, json: false, target: 'registry' } },
+        { apply: false, clients: {}, config, target: 'registry' }
+      )
+    ).rejects.toThrowError('Schema Registry sync client is not configured.');
+  });
+
   it('applies configured subject compatibility before registering a new schema version', async () => {
     const { createCatalogBuilder } = await import('../src/catalog/index.js');
     const config = resolveConfig({

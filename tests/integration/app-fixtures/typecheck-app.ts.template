@@ -1,0 +1,89 @@
+// Compile-only fixture: exercises generated producer/consumer/client APIs and
+// native Platformatic methods so the workspace typecheck catches API regressions.
+import { Consumer, Producer } from '@platformatic/kafka';
+import {
+  createPlatformaticRuntimeClient,
+  createPlatformaticRuntimeConsumer,
+  createPlatformaticRuntimeProducer
+} from 'kafka-typegen/runtime';
+import {
+  EventNames,
+  SchemaRegistryConfig,
+  TopicNames,
+  createClient,
+  createConsumer,
+  createProducer,
+  type TopicName,
+  type UserCreatedPayload,
+  type UserProfiledPayload
+} from './generated/kafka/index.js';
+
+const producerClient = new Producer({
+  bootstrapBrokers: ['{{KAFKA_BROKER}}'],
+  clientId: '{{RUN_ID}}-typecheck-producer'
+});
+const consumerClient = new Consumer({
+  bootstrapBrokers: ['{{KAFKA_BROKER}}'],
+  clientId: '{{RUN_ID}}-typecheck-consumer',
+  groupId: '{{RUN_ID}}-typecheck-consumer-group'
+});
+
+const client = createClient(createPlatformaticRuntimeClient({
+  producer: producerClient,
+  consumer: consumerClient,
+  schemaRegistry: SchemaRegistryConfig
+}));
+const producer = createProducer(createPlatformaticRuntimeProducer({
+  producer: producerClient,
+  schemaRegistry: SchemaRegistryConfig
+}));
+const consumer = createConsumer(createPlatformaticRuntimeConsumer({
+  consumer: consumerClient,
+  schemaRegistry: SchemaRegistryConfig
+}));
+
+const userCreated: UserCreatedPayload = {
+  email: 'ada@example.com',
+  id: 'user-1',
+  isAdmin: true
+};
+const userProfiled: UserProfiledPayload = {
+  balance: null,
+  birthDate: 19800,
+  id: '550e8400-e29b-41d4-a716-446655440000',
+  primaryAddress: {
+    createdAt: Date.now(),
+    street: 'Main Street'
+  },
+  shippingAddress: {
+    createdAt: Date.now(),
+    street: 'Second Street'
+  },
+  status: 'ACTIVE'
+};
+
+void producer.events.userCreated.send(userCreated, { acks: -1 });
+void client.producer.send(EventNames.UserProfiled, userProfiled);
+const userEventsTopicName = resolveTopicName('user.events');
+
+void consumer.events.userCreated.on(async (message) => {
+  message.payload.isAdmin;
+  message.headers?.['x-kafka-typegen-event'];
+}, { mode: 'latest', autocommit: true });
+void consumer.onTopic(userEventsTopicName, async (message) => {
+  message.topic;
+}, { mode: 'latest', autocommit: false });
+void consumer.close(true);
+void producer.close();
+
+function resolveTopicName(topicSuffix: string): TopicName {
+  const topicName = Object.values(TopicNames).find((candidate) =>
+    candidate.endsWith(`.${topicSuffix}`)
+  );
+
+  if (topicName === undefined) {
+    throw new Error(`Topic name not found for suffix '${topicSuffix}'.`);
+  }
+
+  return topicName as TopicName;
+}

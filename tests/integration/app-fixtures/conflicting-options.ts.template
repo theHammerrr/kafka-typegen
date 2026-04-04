@@ -1,0 +1,57 @@
+// Runtime negative test: subscribes to the same topic twice with incompatible
+// consume options and verifies the adapter fails deterministically.
+import { Consumer } from '@platformatic/kafka';
+import { createPlatformaticRuntimeConsumer } from 'kafka-typegen/runtime';
+import {
+  SchemaRegistryConfig,
+  TopicNames,
+  createConsumer,
+  type TopicName
+} from './generated/kafka/index.js';
+
+const consumer = createConsumer(createPlatformaticRuntimeConsumer({
+  consumer: new Consumer({
+    bootstrapBrokers: ['{{KAFKA_BROKER}}'],
+    clientId: '{{RUN_ID}}-conflicting-options-consumer',
+    groupId: '{{RUN_ID}}-conflicting-options-consumer-group'
+  }),
+  schemaRegistry: SchemaRegistryConfig
+}));
+const userEventsTopicName = resolveTopicName('user.events');
+
+await consumer.events.userCreated.on(async () => {}, {
+  autocommit: true,
+  mode: 'latest'
+});
+
+try {
+  // Intentional option conflict: `user.created` already opened this topic stream with autocommit=true.
+  await consumer.onTopic(userEventsTopicName, async () => {}, {
+    autocommit: false,
+    mode: 'latest'
+  });
+  throw new Error('Expected conflicting consume options to fail.');
+} catch (error) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  if (
+    errorMessage !==
+    `Topic '${userEventsTopicName}' is already subscribed with different consume options.`
+  ) {
+    throw new Error(`Unexpected conflicting-options error message: ${errorMessage}`);
+  }
+  console.log('CONFLICT:' + errorMessage);
+} finally {
+  await consumer.close(true);
+}
+
+function resolveTopicName(topicSuffix: string): TopicName {
+  const topicName = Object.values(TopicNames).find((candidate) =>
+    candidate.endsWith(`.${topicSuffix}`)
+  );
+
+  if (topicName === undefined) {
+    throw new Error(`Topic name not found for suffix '${topicSuffix}'.`);
+  }
+
+  return topicName as TopicName;
+}

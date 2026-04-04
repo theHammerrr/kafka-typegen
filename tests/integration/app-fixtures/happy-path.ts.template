@@ -1,0 +1,203 @@
+// End-to-end happy path: validates generated typing, decoded payload contents,
+// event headers, topic routing, manual offset commits, and native client methods.
+import { Consumer, Producer } from '@platformatic/kafka';
+import { createPlatformaticRuntimeClient } from 'kafka-typegen/runtime';
+import {
+  EventNames,
+  SchemaRegistryConfig,
+  TopicNames,
+  createClient,
+  type TopicName
+} from './generated/kafka/index.js';
+
+const producerClient = new Producer({
+  bootstrapBrokers: ['{{KAFKA_BROKER}}'],
+  clientId: '{{RUN_ID}}-happy-path-producer'
+});
+const consumerClient = new Consumer({
+  bootstrapBrokers: ['{{KAFKA_BROKER}}'],
+  clientId: '{{RUN_ID}}-happy-path-consumer',
+  groupId: '{{RUN_ID}}-happy-path-consumer-group'
+});
+const client = createClient(createPlatformaticRuntimeClient({
+  producer: producerClient,
+  consumer: consumerClient,
+  schemaRegistry: SchemaRegistryConfig
+}));
+const userEventsTopicName = resolveTopicName('user.events');
+const userProfileTopicName = resolveTopicName('user.profile');
+
+const receivedEvents: string[] = [];
+let nextUserEventsOffset = 0n;
+let userEventsPartition = 0;
+let resolveAllMessages: (() => void) | undefined;
+const allMessages = new Promise<void>((resolve, reject) => {
+  resolveAllMessages = resolve;
+  setTimeout(() => reject(new Error('Timed out waiting for consumed messages.')), 60_000).unref();
+});
+
+await client.consumer.events.userProfiled.on(async (message) => {
+  assertUserProfiledMessage(message);
+  receivedEvents.push(message.event);
+  maybeResolve();
+}, { autocommit: true, mode: 'latest' });
+await client.consumer.events.userCreated.on(async (message) => {
+  assertUserCreatedMessage(message);
+  receivedEvents.push(message.event);
+  userEventsPartition = message.partition ?? 0;
+  nextUserEventsOffset = BigInt(message.offset ?? '0') + 1n;
+  await client.consumer.commit({
+    offsets: [{
+      leaderEpoch: 0,
+      offset: nextUserEventsOffset,
+      partition: userEventsPartition,
+      topic: userEventsTopicName
+    }]
+  });
+  maybeResolve();
+}, { autocommit: false, mode: 'latest' });
+await client.consumer.events.userUpdated.on(async (message) => {
+  assertUserUpdatedMessage(message);
+  receivedEvents.push(message.event);
+  userEventsPartition = message.partition ?? 0;
+  nextUserEventsOffset = BigInt(message.offset ?? '0') + 1n;
+  await client.consumer.commit({
+    offsets: [{
+      leaderEpoch: 0,
+      offset: nextUserEventsOffset,
+      partition: userEventsPartition,
+      topic: userEventsTopicName
+    }]
+  });
+  maybeResolve();
+}, { autocommit: false, mode: 'latest' });
+
+await client.producer.events.userProfiled.send({
+  balance: null,
+  birthDate: 19800,
+  id: '550e8400-e29b-41d4-a716-446655440000',
+  primaryAddress: {
+    createdAt: 1_700_000_000_000,
+    street: 'Main Street'
+  },
+  shippingAddress: {
+    createdAt: 1_700_000_100_000,
+    street: 'Second Street'
+  },
+  status: 'ACTIVE'
+}, { acks: -1 });
+await client.producer.events.userCreated.send({
+  email: 'ada@example.com',
+  id: 'user-1',
+  isAdmin: true
+}, { acks: -1 });
+await client.producer.events.userUpdated.send({
+  displayName: 'Ada',
+  id: 'user-1',
+  metadata: {
+    role: 'admin'
+  }
+}, { acks: -1 });
+
+await allMessages;
+
+if ([...receivedEvents].sort().join(',') !== 'user.created,user.profiled,user.updated') {
+  throw new Error('Unexpected consumed events: ' + JSON.stringify(receivedEvents));
+}
+
+const committedOffsets = await client.consumer.listCommittedOffsets({
+  topics: [{
+    partitions: [userEventsPartition],
+    topic: userEventsTopicName
+  }]
+});
+
+if ((committedOffsets.get(userEventsTopicName)?.[userEventsPartition] ?? 0n) < nextUserEventsOffset) {
+  throw new Error('Expected manual commit to persist the user.events offset.');
+}
+
+await client.producer.close();
+await client.consumer.close(true);
+console.log('HAPPY_PATH_OK');
+
+function maybeResolve(): void {
+  if (receivedEvents.length === 3) {
+    resolveAllMessages?.();
+  }
+}
+
+function assertUserCreatedMessage(message: {
+  readonly event: string;
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly payload: { readonly email: string; readonly id: string; readonly isAdmin: boolean };
+  readonly topic: string;
+}): void {
+  if (
+    message.event !== EventNames.UserCreated ||
+    message.topic !== userEventsTopicName ||
+    message.headers?.['x-kafka-typegen-event'] !== EventNames.UserCreated ||
+    message.payload.email !== 'ada@example.com' ||
+    message.payload.id !== 'user-1' ||
+    message.payload.isAdmin !== true
+  ) {
+    throw new Error('Unexpected user.created message: ' + JSON.stringify(message));
+  }
+}
+
+function assertUserUpdatedMessage(message: {
+  readonly event: string;
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly payload: {
+    readonly displayName: string | null;
+    readonly id: string;
+    readonly metadata: Readonly<Record<string, string>>;
+  };
+  readonly topic: string;
+}): void {
+  if (
+    message.event !== EventNames.UserUpdated ||
+    message.topic !== userEventsTopicName ||
+    message.headers?.['x-kafka-typegen-event'] !== EventNames.UserUpdated ||
+    message.payload.displayName !== 'Ada' ||
+    message.payload.id !== 'user-1' ||
+    message.payload.metadata.role !== 'admin'
+  ) {
+    throw new Error('Unexpected user.updated message: ' + JSON.stringify(message));
+  }
+}
+
+function assertUserProfiledMessage(message: {
+  readonly event: string;
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly payload: {
+    readonly birthDate: number;
+    readonly id: string;
+    readonly primaryAddress: { readonly createdAt: number; readonly street: string };
+    readonly status: string;
+  };
+  readonly topic: string;
+}): void {
+  if (
+    message.event !== EventNames.UserProfiled ||
+    message.topic !== userProfileTopicName ||
+    message.headers?.['x-kafka-typegen-event'] !== EventNames.UserProfiled ||
+    message.payload.birthDate !== 19800 ||
+    message.payload.id !== '550e8400-e29b-41d4-a716-446655440000' ||
+    message.payload.primaryAddress.street !== 'Main Street' ||
+    message.payload.status !== 'ACTIVE'
+  ) {
+    throw new Error('Unexpected user.profiled message: ' + JSON.stringify(message));
+  }
+}
+
+function resolveTopicName(topicSuffix: string): TopicName {
+  const topicName = Object.values(TopicNames).find((candidate) =>
+    candidate.endsWith(`.${topicSuffix}`)
+  );
+
+  if (topicName === undefined) {
+    throw new Error(`Topic name not found for suffix '${topicSuffix}'.`);
+  }
+
+  return topicName as TopicName;
+}
