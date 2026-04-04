@@ -169,24 +169,67 @@ describe('type generation', () => {
     expect(contents).toContain(`export type UserStatus = 'ACTIVE' | 'DISABLED';`);
     expect(contents).toContain(`export interface Address {
   street: string;
-  createdAt: number;
+  createdAt: AvroTimestampMillis;
 }`);
     expect(contents).toContain(`export interface UserProfiledPayload {
   id: string;
   status: UserStatus;
   primaryAddress: Address;
   shippingAddress: Address;
-  birthDate: number;
-  balance: null | Uint8Array;
+  birthDate: AvroDate;
+  balance: null | AvroDecimal;
+}`);
+  });
+
+  it('resolves cross-file named references and recursive record references', async () => {
+    const output = await buildGeneratedOutput({
+      outputDir: './generated',
+      sources: {
+        rootDir: schemaFixturesDir
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'address.shared',
+              schemaPath: './shared-address.avsc'
+            },
+            {
+              name: 'user.addressReferenced',
+              schemaPath: './user-address-referenced.avsc'
+            },
+            {
+              name: 'user.nodeLinked',
+              schemaPath: './user-node.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+    const contents =
+      output.files.find((file) => file.filePath === 'kafka-client.ts')
+        ?.contents ?? '';
+
+    expect(contents).toContain(`export interface AddressSharedPayload {
+  street: string;
+}`);
+    expect(contents).toContain(`export interface UserAddressReferencedPayload {
+  primaryAddress: AddressSharedPayload;
+  shippingAddress: AddressSharedPayload;
+}`);
+    expect(contents).toContain(`export interface UserNodeLinkedPayload {
+  id: string;
+  next: null | UserNodeLinkedPayload;
 }`);
   });
 
   it('renders Avro references, logical types, nested records, unions, arrays, maps, and enums', () => {
     expect(toTypeScriptType('com.example.UserCreated')).toBe('UserCreated');
     expect(toTypeScriptType({ logicalType: 'uuid', type: 'string' })).toBe('string');
-    expect(toTypeScriptType({ logicalType: 'date', type: 'int' })).toBe('number');
-    expect(toTypeScriptType({ logicalType: 'timestamp-millis', type: 'long' })).toBe('number');
-    expect(toTypeScriptType({ logicalType: 'decimal', type: 'bytes' })).toBe('Uint8Array');
+    expect(toTypeScriptType({ logicalType: 'date', type: 'int' })).toBe('AvroDate');
+    expect(toTypeScriptType({ logicalType: 'timestamp-millis', type: 'long' })).toBe('AvroTimestampMillis');
+    expect(toTypeScriptType({ logicalType: 'decimal', type: 'bytes' })).toBe('AvroDecimal');
     expect(toTypeScriptType(['null', 'string'])).toBe('null | string');
     expect(toTypeScriptType({
       items: 'string',

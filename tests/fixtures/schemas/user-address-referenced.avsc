@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "UserAddressReferenced",
+  "namespace": "com.example.users",
+  "fields": [
+    {
+      "name": "primaryAddress",
+      "type": "SharedAddress"
+    },
+    {
+      "name": "shippingAddress",
+      "type": "com.example.users.SharedAddress"
+    }
+  ]
+}

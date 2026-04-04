@@ -133,4 +133,84 @@ describe('event schema integration', () => {
       type: 'null | string'
     });
   });
+
+  it('resolves cross-file Avro named references through a shared schema registry', async () => {
+    const normalizedConfig = resolveConfig({
+      outputDir: './generated',
+      sources: {
+        rootDir: fixturesDir
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.addressReferenced',
+              schemaPath: './user-address-referenced.avsc'
+            },
+            {
+              name: 'address.shared',
+              schemaPath: './shared-address.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+
+    const schemas = await createEventSchemaLoader().loadEventSchemas(
+      normalizedConfig.events
+    );
+
+    expect(schemas.map((schema) => schema.schema.name)).toEqual([
+      'SharedAddress',
+      'UserAddressReferenced'
+    ]);
+    expect(
+      schemas.find((schema) => schema.schema.name === 'UserAddressReferenced')
+        ?.schema.fields
+    ).toEqual([
+      {
+        name: 'primaryAddress',
+        path: 'UserAddressReferenced.primaryAddress',
+        rawType: 'SharedAddress',
+        type: 'SharedAddress'
+      },
+      {
+        name: 'shippingAddress',
+        path: 'UserAddressReferenced.shippingAddress',
+        rawType: 'com.example.users.SharedAddress',
+        type: 'com.example.users.SharedAddress'
+      }
+    ]);
+  });
+
+  it('rejects duplicate top-level Avro schema names across files', async () => {
+    const normalizedConfig = resolveConfig({
+      outputDir: './generated',
+      sources: {
+        rootDir: fixturesDir
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './user-created.avsc'
+            },
+            {
+              name: 'user.createdDuplicate',
+              schemaPath: './duplicate-user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+
+    await expect(
+      createEventSchemaLoader().loadEventSchemas(normalizedConfig.events)
+    ).rejects.toThrow(
+      "Duplicate top-level Avro schema name 'com.example.users.UserCreated'"
+    );
+  });
 });
