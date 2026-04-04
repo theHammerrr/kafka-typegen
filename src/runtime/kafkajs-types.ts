@@ -10,7 +10,8 @@ import type {
 import type { RuntimeSerializationOptions } from './types.js';
 
 export type KafkaJsProducerLike = Pick<Producer, 'send'>;
-export type KafkaJsConsumerLike = Pick<Consumer, 'run' | 'stop' | 'subscribe'>;
+export type KafkaJsConsumerLike = Pick<Consumer, 'run' | 'stop' | 'subscribe'> &
+  Partial<Pick<Consumer, 'disconnect'>>;
 export type KafkaJsMessage = EachMessagePayload;
 
 export type KafkaJsProducerSendOptions = Omit<ProducerRecord, 'messages' | 'topic'>;

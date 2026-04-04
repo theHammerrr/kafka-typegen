@@ -117,7 +117,7 @@ if ((committedOffsets.get(userEventsTopicName)?.[userEventsPartition] ?? 0n) < n
 }
 
 await client.producer.close();
-await client.consumer.close(true);
+await client.consumer.close({ force: true });
 console.log('HAPPY_PATH_OK');
 
 function maybeResolve(): void {

@@ -90,6 +90,8 @@ export interface RuntimeTransportConsumer<TSubscriptionOptions = unknown> {
     handler: (message: RuntimeIncomingMessage) => Promise<void> | void,
     options?: TSubscriptionOptions
   ): Promise<void>;
+  close?(options?: RuntimeConsumerCloseOptions): Promise<void>;
+  stop?(): Promise<void>;
 }
 
 export interface RuntimeProducer<TSendOptions = unknown> {
@@ -114,7 +116,12 @@ export interface RuntimeConsumerMessage<TPayload = unknown> {
   readonly topicName: string;
 }
 
+export interface RuntimeConsumerCloseOptions {
+  readonly force?: boolean;
+}
+
 export interface RuntimeConsumer<TSubscriptionOptions = unknown> {
+  close(options?: RuntimeConsumerCloseOptions): Promise<void>;
   on<TPayload>(
     metadata: RuntimeEventMetadata,
     handler: (message: RuntimeConsumerMessage<TPayload>) => Promise<void> | void,
@@ -126,6 +133,7 @@ export interface RuntimeConsumer<TSubscriptionOptions = unknown> {
     handler: (message: RuntimeConsumerMessage<TPayload>) => Promise<void> | void,
     options?: TSubscriptionOptions
   ): Promise<void>;
+  stop(): Promise<void>;
 }
 
 export interface RuntimeClient<

@@ -1,3 +1,12 @@
+import {
+  buildPlatformaticConsumerOptionsSignature,
+  reportPlatformaticConsumerError
+} from './platformatic-consumer-options.js';
+import {
+  type PlatformaticTopicSubscription,
+  closePlatformaticConsumer,
+  stopPlatformaticTopicStreams
+} from './platformatic-consumer-lifecycle.js';
 import type { RuntimeIncomingMessage, RuntimeTransportConsumer } from './types.js';
 import { toRuntimeIncomingMessage } from './platformatic-message.js';
 import type {
@@ -12,49 +21,10 @@ type PlatformaticTopicHandler = (
   message: RuntimeIncomingMessage
 ) => Promise<void> | void;
 
-interface PlatformaticTopicSubscription<TKey> {
+interface PlatformaticTopicSubscriptionState<TKey>
+  extends PlatformaticTopicSubscription<TKey> {
   readonly handlers: Set<PlatformaticTopicHandler>;
   readonly optionsSignature: string;
-  readonly stream: PlatformaticMessagesStream<TKey>;
-}
-
-function reportConsumerError(
-  error: unknown,
-  onError: ((error: unknown) => void) | undefined
-): void {
-  if (onError !== undefined) {
-    onError(error);
-    return;
-  }
-
-  queueMicrotask(() => {
-    throw error;
-  });
-}
-
-function stringifyOptionValue(value: unknown): string {
-  if (value === null || typeof value !== 'object') {
-    return JSON.stringify(value);
-  }
-
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stringifyOptionValue(item)).join(',')}]`;
-  }
-
-  return `{${Object.entries(value as Record<string, unknown>)
-    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
-    .map(([key, entryValue]) => `${JSON.stringify(key)}:${stringifyOptionValue(entryValue)}`)
-    .join(',')}}`;
-}
-
-function buildOptionsSignature<TKey>(
-  options: PlatformaticConsumerTransportOptions<TKey>,
-  subscribeOptions: PlatformaticConsumerSubscribeOptions<TKey> | undefined
-): string {
-  return stringifyOptionValue({
-    ...(options.consumeOptions ?? {}),
-    ...(subscribeOptions ?? {})
-  });
 }
 
 export function createPlatformaticConsumerTransport<TKey = Buffer>(
@@ -63,12 +33,18 @@ export function createPlatformaticConsumerTransport<TKey = Buffer>(
 ): RuntimeTransportConsumer<PlatformaticConsumerSubscribeOptions<TKey>> {
   const subscriptionsByTopic = new Map<
     string,
-    PlatformaticTopicSubscription<TKey>
+    PlatformaticTopicSubscriptionState<TKey>
   >();
 
   return {
+    async close(closeOptions) {
+      await closePlatformaticConsumer(consumer, subscriptionsByTopic, closeOptions);
+    },
     async onTopic(topicName, handler, subscribeOptions) {
-      const optionsSignature = buildOptionsSignature(options, subscribeOptions);
+      const optionsSignature = buildPlatformaticConsumerOptionsSignature(
+        options,
+        subscribeOptions
+      );
       const existingSubscription = subscriptionsByTopic.get(topicName);
 
       if (existingSubscription !== undefined) {
@@ -100,14 +76,17 @@ export function createPlatformaticConsumerTransport<TKey = Buffer>(
         const runtimeMessage = toRuntimeIncomingMessage(message as PlatformaticMessage<TKey>);
         for (const topicHandler of topicHandlers) {
           void Promise.resolve(topicHandler(runtimeMessage)).catch((error) => {
-            reportConsumerError(error, options.onError);
+            reportPlatformaticConsumerError(error, options.onError);
           });
         }
       });
 
       stream.on('error', (error) => {
-        reportConsumerError(error, options.onError);
+        reportPlatformaticConsumerError(error, options.onError);
       });
+    },
+    async stop() {
+      await stopPlatformaticTopicStreams(subscriptionsByTopic);
     }
   };
 }

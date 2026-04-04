@@ -60,7 +60,7 @@ if (!errorMessage.includes('999999')) {
 
 console.log('CONSUMER_ERROR:' + errorMessage);
 await producer.close();
-await consumer.close(true);
+await consumer.close({ force: true });
 
 function resolveTopicName(topicSuffix: string): TopicName {
   const topicName = Object.values(TopicNames).find((candidate) =>

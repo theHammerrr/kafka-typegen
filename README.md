@@ -484,8 +484,7 @@ await client.producer.events.userCreated.send({
   acks: -1
 });
 
-await client.consumer.stop();
-await client.consumer.disconnect();
+await client.consumer.close();
 await client.producer.disconnect();
 ```
 
@@ -495,6 +494,7 @@ KafkaJS-specific behavior:
 - repeated subscriptions to the same topic must use the same `fromBeginning` option
 - subscribing a new topic after `consumer.run()` has started is rejected
 - native KafkaJS methods like `connect`, `disconnect`, `stop`, `commitOffsets`, `pause`, `resume`, and `on` remain available on the generated wrapper
+- `consumer.close()` stops active consumption and disconnects the underlying KafkaJS consumer
 
 ### Platformatic runtime
 
@@ -589,6 +589,30 @@ Recommended compatibility policy:
 - If `sync.schemaRegistry.compatibility` is omitted, `kafka-typegen` does not change the subject policy and Schema Registry keeps its existing compatibility setting.
 
 For a given topic, repeated generated subscriptions must use the same consume options. Conflicting options are rejected instead of being ignored.
+
+### Consumer Shutdown
+
+The generated consumer exposes a transport-aware lifecycle API:
+
+```ts
+process.once('SIGINT', async () => {
+  await client.consumer.close();
+  process.exit(0);
+});
+
+process.once('SIGTERM', async () => {
+  await client.consumer.close();
+  process.exit(0);
+});
+```
+
+Use `await client.consumer.stop()` when you only want to stop active consumption but keep the native client available.
+
+For Platformatic, `client.consumer.close()` first closes active topic streams, then closes the native consumer. If the native client still refuses to leave the consumer group because a stream is active, the wrapper retries with a forced close. You can also request that directly:
+
+```ts
+await client.consumer.close({ force: true });
+```
 
 ### Runtime Schema Registry Support
 

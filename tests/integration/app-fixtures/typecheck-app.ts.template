@@ -73,7 +73,7 @@ void consumer.events.userCreated.on(async (message) => {
 void consumer.onTopic(userEventsTopicName, async (message) => {
   message.topic;
 }, { mode: 'latest', autocommit: false });
-void consumer.close(true);
+void consumer.close({ force: true });
 void producer.close();
 
 function resolveTopicName(topicSuffix: string): TopicName {

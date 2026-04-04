@@ -14,6 +14,7 @@ export type {
   RuntimeClient,
   RuntimeClientOptions,
   RuntimeConsumer,
+  RuntimeConsumerCloseOptions,
   RuntimeConsumerMessage,
   RuntimeConsumerOptions,
   RuntimeEventMetadata,

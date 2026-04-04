@@ -64,6 +64,10 @@ function createSchemaRegistryMock(): {
 }
 
 class MockMessagesStream<TKey = unknown> extends EventEmitter {
+  public readonly close = vi.fn(async () => {
+    this.emit('close');
+  });
+
   public emitData(message: {
     headers?: Map<Buffer, Buffer>;
     key?: TKey;
@@ -222,6 +226,48 @@ describe('platformatic runtime adapter', () => {
     expect(onError).toHaveBeenCalledWith(expect.objectContaining({
       message: 'Stream failed.'
     }));
+  });
+
+  it('stops active Platformatic streams before closing the consumer and force-closes on leave-group failures', async () => {
+    const stream = new MockMessagesStream();
+    const consume = vi.fn().mockResolvedValue(stream);
+    const close = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Cannot leave group while consuming messages.'))
+      .mockResolvedValueOnce(undefined);
+    const consumer = createPlatformaticRuntimeConsumer({
+      consumer: {
+        close,
+        consume
+      },
+      serialization: {
+        async deserialize<TPayload>() {
+          return {} as TPayload;
+        },
+        async serialize() {
+          return {
+            value: Buffer.from('unused')
+          };
+        }
+      }
+    });
+
+    await consumer.on(
+      {
+        eventName: 'user.created',
+        payloadTypeName: 'UserCreatedPayload',
+        schemaFilePath: 'user-created.avsc',
+        schemaName: 'UserCreated',
+        subjectName: 'user.events-user.created',
+        topicName: 'user.events'
+      },
+      async () => {}
+    );
+    await consumer.close();
+
+    expect(stream.close).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenNthCalledWith(1, false);
+    expect(close).toHaveBeenNthCalledWith(2, true);
   });
 
   it('ignores unknown events in topic-based runtime client handlers', async () => {

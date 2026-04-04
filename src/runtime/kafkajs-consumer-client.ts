@@ -29,7 +29,6 @@ export type KafkaJsRuntimeConsumer<TConsumer = KafkaJsConsumerLike> = Omit<
 > &
   RuntimeConsumer<KafkaJsConsumerSubscribeOptions> & {
     run(options?: KafkaJsConsumerRunOptions): Promise<void>;
-    stop(): Promise<void>;
   };
 
 export type KafkaJsRuntimeConsumerOptions<
@@ -86,6 +85,7 @@ export function toKafkaJsRuntimeConsumer<
   const nativeOn = (consumer as KafkaJsConsumerEventSource).on?.bind(consumer);
 
   return createRuntimeClientProxy(consumer, {
+    close: runtimeConsumer.close.bind(runtimeConsumer),
     on: ((
       eventOrMetadata: unknown,
       handler: unknown,
@@ -103,6 +103,6 @@ export function toKafkaJsRuntimeConsumer<
           )) as KafkaJsRuntimeConsumer<TConsumer>['on'],
     onTopic: runtimeConsumer.onTopic.bind(runtimeConsumer),
     run: transport.run.bind(transport),
-    stop: transport.stop.bind(transport)
+    stop: runtimeConsumer.stop.bind(runtimeConsumer)
   });
 }

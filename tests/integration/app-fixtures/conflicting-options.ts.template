@@ -41,7 +41,7 @@ try {
   }
   console.log('CONFLICT:' + errorMessage);
 } finally {
-  await consumer.close(true);
+  await consumer.close({ force: true });
 }
 
 function resolveTopicName(topicSuffix: string): TopicName {
