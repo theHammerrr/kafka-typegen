@@ -5,5 +5,7 @@ export function getRuntimeModule(transport: RuntimeTransport, explicitModule?: s
     return explicitModule;
   }
 
-  return transport === '@platformatic/kafka' ? 'kafka-typegen/runtime/platformatic' : 'kafka-typegen/runtime';
+  return transport === '@platformatic/kafka'
+    ? 'kafka-typegen/runtime/platformatic'
+    : 'kafka-typegen/runtime/kafkajs';
 }

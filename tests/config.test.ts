@@ -618,7 +618,7 @@ describe('config normalization', () => {
     });
 
     expect(defaultKafkaJsConfig.runtime).toEqual({
-      module: 'kafka-typegen/runtime',
+      module: 'kafka-typegen/runtime/kafkajs',
       transport: 'kafkajs'
     });
     expect(defaultPlatformaticConfig.runtime).toEqual({

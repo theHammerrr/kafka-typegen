@@ -1,4 +1,4 @@
-import { createPlatformaticClientProxy } from './platformatic-client-proxy.js';
+import { createRuntimeClientProxy } from './client-proxy.js';
 import { createRuntimeProducer } from './producer-client.js';
 import { createPlatformaticProducerTransport } from './platformatic-producer.js';
 import type {
@@ -69,7 +69,7 @@ export function toPlatformaticRuntimeProducer<
 ): PlatformaticRuntimeProducer<TProducer> {
   const send = producer.send.bind(producer) as PlatformaticSendDelegate;
 
-  return createPlatformaticClientProxy(producer, {
+  return createRuntimeClientProxy(producer, {
     send: ((
       messageOrMetadata: unknown,
       payloadOrCallback?: unknown,

@@ -1,4 +1,4 @@
-import { createPlatformaticClientProxy } from './platformatic-client-proxy.js';
+import { createRuntimeClientProxy } from './client-proxy.js';
 import { createRuntimeConsumer } from './consumer-client.js';
 import { createPlatformaticConsumerTransport } from './platformatic-consumer.js';
 import type {
@@ -75,7 +75,7 @@ export function toPlatformaticRuntimeConsumer<
 ): PlatformaticRuntimeConsumer<TConsumer> {
   const nativeOn = (consumer as PlatformaticConsumerEventSource).on?.bind(consumer);
 
-  return createPlatformaticClientProxy(consumer, {
+  return createRuntimeClientProxy(consumer, {
     on: ((
       eventOrMetadata: unknown,
       handler: unknown,

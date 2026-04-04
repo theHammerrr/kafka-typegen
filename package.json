@@ -30,6 +30,11 @@
       "import": "./dist/runtime/advanced.js",
       "require": "./dist/runtime/advanced.cjs"
     },
+    "./runtime/kafkajs": {
+      "types": "./dist/runtime/kafkajs.d.ts",
+      "import": "./dist/runtime/kafkajs.js",
+      "require": "./dist/runtime/kafkajs.cjs"
+    },
     "./runtime/platformatic": {
       "types": "./dist/runtime/platformatic.d.ts",
       "import": "./dist/runtime/platformatic.js",
