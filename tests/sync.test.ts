@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildKafkaTopicPlan, buildSchemaRegistryPlan, executeSync, resolveConfig, type SyncClients } from '../src/index.js';
+import {
+  buildSchemaEvolutionHints,
+  formatSchemaEvolutionHints
+} from '../src/sync/schema-evolution-hints.js';
 
 function createConfig() {
   return resolveConfig({
@@ -446,6 +450,55 @@ describe('sync execution', () => {
         details:
           "Registered a new schema version for event 'user.created'. Compatibility BACKWARD was applied."
       })
+    ]);
+  });
+});
+
+describe('schema evolution hints', () => {
+  it('detects likely breaking field and enum changes', () => {
+    const previous = JSON.stringify({
+      fields: [
+        { name: 'id', type: 'string' },
+        { default: null, name: 'displayName', type: ['null', 'string'] },
+        {
+          name: 'status',
+          type: {
+            name: 'Status',
+            symbols: ['ACTIVE', 'DISABLED'],
+            type: 'enum'
+          }
+        }
+      ],
+      name: 'UserCreated',
+      type: 'record'
+    });
+    const next = JSON.stringify({
+      fields: [
+        { name: 'id', type: 'long' },
+        { name: 'displayName', type: 'string' },
+        {
+          name: 'status',
+          type: {
+            name: 'Status',
+            symbols: ['ACTIVE'],
+            type: 'enum'
+          }
+        },
+        { name: 'role', type: 'string' }
+      ],
+      name: 'UserCreated',
+      type: 'record'
+    });
+
+    expect(buildSchemaEvolutionHints(previous, next)).toEqual([
+      "Enum at 'schema.fields[2]' removed symbol(s): DISABLED. Removing enum symbols is often incompatible.",
+      "Field 'displayName' changed from optional to required. Consider a staged rollout where producers populate it before tightening the schema.",
+      "Field 'displayName' changed type from 'union(null|string)' to 'string'. This is often incompatible for existing data.",
+      "Field 'id' changed type from 'string' to 'long'. This is often incompatible for existing data.",
+      "Field 'role' was added without a default. Consider making it nullable or adding a default value first."
+    ]);
+    expect(formatSchemaEvolutionHints(buildSchemaEvolutionHints(previous, next))).toEqual([
+      "Evolution hints: Enum at 'schema.fields[2]' removed symbol(s): DISABLED. Removing enum symbols is often incompatible. Field 'displayName' changed from optional to required. Consider a staged rollout where producers populate it before tightening the schema. Field 'displayName' changed type from 'union(null|string)' to 'string'. This is often incompatible for existing data. Field 'id' changed type from 'string' to 'long'. This is often incompatible for existing data. Field 'role' was added without a default. Consider making it nullable or adding a default value first."
     ]);
   });
 });

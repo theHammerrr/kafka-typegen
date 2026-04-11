@@ -581,6 +581,8 @@ Recommended Avro evolution pattern:
 
 Schema Registry compatibility modes such as `BACKWARD` and `FULL` are enforced by Schema Registry itself. `kafka-typegen sync --apply` does not bypass those checks; it surfaces the registry error if a new schema version is rejected.
 
+When drift is detected, `kafka-typegen sync` also emits conservative evolution hints for common breaking changes such as adding a field without a default, removing a required field, changing an optional field to required, removing enum symbols, or changing a field type. These hints are guidance, not a replacement for Schema Registry compatibility checks.
+
 Recommended compatibility policy:
 
 - Use `BACKWARD` for most Kafka event streams. That fits the common rollout order of deploying consumers first, then producers, and allows additive schema changes when new fields are nullable or have defaults.
