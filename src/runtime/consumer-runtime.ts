@@ -1,4 +1,4 @@
-import { toConsumerMessage } from './consumer-message.js';
+import { handleObservedConsumerMessage } from './consumer-observability.js';
 import { RUNTIME_EVENT_HEADER } from './producer-runtime.js';
 import type {
   ResolvedRuntimeClientOptions,
@@ -27,8 +27,7 @@ export class DefaultRuntimeConsumer<TSubscriptionOptions = unknown>
         return;
       }
 
-      const payload = await this.options.serialization.deserialize<TPayload>(metadata, message);
-      await handler(toConsumerMessage(metadata, message, payload));
+      await handleObservedConsumerMessage(this.options, metadata, message, handler);
     }, options);
   }
 
@@ -49,8 +48,7 @@ export class DefaultRuntimeConsumer<TSubscriptionOptions = unknown>
         return;
       }
 
-      const payload = await this.options.serialization.deserialize<TPayload>(metadata, message);
-      await handler(toConsumerMessage(metadata, message, payload));
+      await handleObservedConsumerMessage(this.options, metadata, message, handler);
     }, options);
   }
 }

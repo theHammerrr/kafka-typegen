@@ -1,3 +1,4 @@
+import type { KafkaTypegenObservabilityOptions } from '../observability.js';
 import { createPlatformaticClientProxy } from './platformatic-client-proxy.js';
 import { createRuntimeProducer } from './producer-client.js';
 import { createPlatformaticProducerTransport } from './platformatic-producer.js';
@@ -28,7 +29,7 @@ export type PlatformaticRuntimeProducerOptions<
   TProducer extends PlatformaticProducerLike<TKey> = PlatformaticProducerLike<TKey>
 > = RuntimeSerializationOptions & {
   readonly producer: TProducer;
-};
+} & KafkaTypegenObservabilityOptions;
 
 function isRuntimeEventMetadata(value: unknown): value is RuntimeEventMetadata {
   return (
@@ -53,6 +54,8 @@ export function createPlatformaticRuntimeProducer<
     options.producer,
     createRuntimeProducer({
       producerTransport: createPlatformaticProducerTransport(options.producer),
+      ...(options.logger !== undefined ? { logger: options.logger } : {}),
+      ...(options.observer !== undefined ? { observer: options.observer } : {}),
       ...(options.schemaRegistry !== undefined
         ? { schemaRegistry: options.schemaRegistry }
         : { serialization: options.serialization })

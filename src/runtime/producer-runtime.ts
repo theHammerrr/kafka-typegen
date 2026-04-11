@@ -1,3 +1,4 @@
+import { emitObservedEvent, toErrorString } from '../observability.js';
 import type {
   ResolvedRuntimeClientOptions,
   RuntimeEventMetadata,
@@ -18,17 +19,43 @@ export class DefaultRuntimeProducer<TSendOptions = unknown>
     payload: unknown,
     options?: TSendOptions
   ): Promise<void> {
-    const serialized = await this.options.serialization.serialize(metadata, payload);
-
-    const outgoingMessage: RuntimeOutgoingMessage = {
+    await emitObservedEvent(this.options.observability, {
+      eventName: metadata.eventName,
       topicName: metadata.topicName,
-      value: serialized.value,
-      headers: { ...(serialized.headers ?? {}), [RUNTIME_EVENT_HEADER]: metadata.eventName },
-      ...(serialized.key !== undefined ? { key: serialized.key } : {}),
-      ...(serialized.schemaId !== undefined ? { schemaId: serialized.schemaId } : {})
-    };
+      type: 'runtime.producer.send.start'
+    });
 
-    await this.options.producerTransport.send(outgoingMessage, options);
+    try {
+      const serialized = await this.options.serialization.serialize(metadata, payload);
+
+      const outgoingMessage: RuntimeOutgoingMessage = {
+        topicName: metadata.topicName,
+        value: serialized.value,
+        headers: { ...(serialized.headers ?? {}), [RUNTIME_EVENT_HEADER]: metadata.eventName },
+        ...(serialized.key !== undefined ? { key: serialized.key } : {}),
+        ...(serialized.schemaId !== undefined ? { schemaId: serialized.schemaId } : {})
+      };
+
+      await this.options.producerTransport.send(outgoingMessage, options);
+      await emitObservedEvent(this.options.observability, {
+        eventName: metadata.eventName,
+        topicName: metadata.topicName,
+        type: 'runtime.producer.send.success'
+      });
+    } catch (error) {
+      this.options.observability.logger.error('Runtime producer send failed.', {
+        error: toErrorString(error),
+        eventName: metadata.eventName,
+        topicName: metadata.topicName
+      });
+      await emitObservedEvent(this.options.observability, {
+        error: toErrorString(error),
+        eventName: metadata.eventName,
+        topicName: metadata.topicName,
+        type: 'runtime.producer.send.failure'
+      });
+      throw error;
+    }
   }
 }
 

@@ -1,3 +1,8 @@
+import type {
+  KafkaTypegenObservabilityOptions,
+  ResolvedKafkaTypegenObservability
+} from '../observability.js';
+
 export interface RuntimeEventMetadata {
   readonly eventName: string;
   readonly payloadTypeName: string;
@@ -141,6 +146,7 @@ export interface ResolvedRuntimeClientOptions<
   TSubscriptionOptions = unknown
 > {
   readonly consumerTransport: RuntimeTransportConsumer<TSubscriptionOptions>;
+  readonly observability: ResolvedKafkaTypegenObservability;
   readonly serialization: RuntimeSerializationHooks;
   readonly producerTransport: RuntimeTransportProducer<TSendOptions>;
 }
@@ -151,12 +157,15 @@ export type RuntimeClientOptions<
 > = {
   readonly consumerTransport: RuntimeTransportConsumer<TSubscriptionOptions>;
   readonly producerTransport: RuntimeTransportProducer<TSendOptions>;
-} & RuntimeSerializationOptions;
+} & RuntimeSerializationOptions &
+  KafkaTypegenObservabilityOptions;
 
 export type RuntimeProducerOptions<TSendOptions = unknown> = {
   readonly producerTransport: RuntimeTransportProducer<TSendOptions>;
-} & RuntimeSerializationOptions;
+} & RuntimeSerializationOptions &
+  KafkaTypegenObservabilityOptions;
 
 export type RuntimeConsumerOptions<TSubscriptionOptions = unknown> = {
   readonly consumerTransport: RuntimeTransportConsumer<TSubscriptionOptions>;
-} & RuntimeSerializationOptions;
+} & RuntimeSerializationOptions &
+  KafkaTypegenObservabilityOptions;

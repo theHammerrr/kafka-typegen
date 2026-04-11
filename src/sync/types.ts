@@ -1,5 +1,6 @@
 import type { EventCatalog } from '../catalog/index.js';
 import type { NormalizedKafkaTypegenConfig } from '../config/index.js';
+import type { KafkaTypegenObservabilityOptions } from '../observability.js';
 
 export type SyncTarget = 'all' | 'kafka' | 'registry';
 export type SyncOperationAction = 'create' | 'drift' | 'noop';
@@ -80,3 +81,5 @@ export interface SyncContext {
   readonly config: NormalizedKafkaTypegenConfig;
   readonly options: SyncCliOptions;
 }
+
+export type SyncExecutionOptions = SyncExecutorOptions & KafkaTypegenObservabilityOptions;

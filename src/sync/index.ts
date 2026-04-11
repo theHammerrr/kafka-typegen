@@ -1,3 +1,9 @@
+export type {
+  KafkaTypegenLogger,
+  KafkaTypegenObservedEvent,
+  KafkaTypegenObservabilityOptions,
+  KafkaTypegenObserver
+} from '../observability.js';
 export { createSyncClients } from './clients.js';
 export { executeSync } from './executor.js';
 export { formatSyncResult } from './format.js';
@@ -13,6 +19,7 @@ export type {
   SyncCliOptions,
   SyncClients,
   SyncContext,
+  SyncExecutionOptions,
   SyncExecutionResult,
   SyncOperation,
   SyncTarget

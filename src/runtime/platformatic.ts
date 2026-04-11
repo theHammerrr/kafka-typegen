@@ -1,3 +1,4 @@
+import { resolveObservability } from '../observability.js';
 import { createRuntimeClient } from './client.js';
 export type {
   SchemaRegistryRuntimeClient,
@@ -54,13 +55,20 @@ export function createPlatformaticRuntimeClient<
 >(
   options: PlatformaticRuntimeClientOptions<TKey, TProducer, TConsumer>
 ): PlatformaticRuntimeClient<TProducer, TConsumer> {
+  const observability = resolveObservability(options);
   const runtime = createRuntimeClient({
-    consumerTransport: createPlatformaticConsumerTransport(options.consumer, {
-      ...(options.consumeOptions !== undefined
-        ? { consumeOptions: options.consumeOptions }
-        : {})
-    }),
+    consumerTransport: createPlatformaticConsumerTransport(
+      options.consumer,
+      {
+        ...(options.consumeOptions !== undefined
+          ? { consumeOptions: options.consumeOptions }
+          : {})
+      },
+      observability
+    ),
     producerTransport: createPlatformaticProducerTransport(options.producer),
+    ...(options.logger !== undefined ? { logger: options.logger } : {}),
+    ...(options.observer !== undefined ? { observer: options.observer } : {}),
     ...(options.schemaRegistry !== undefined
       ? { schemaRegistry: options.schemaRegistry }
       : { serialization: options.serialization })

@@ -1,3 +1,9 @@
+export type {
+  KafkaTypegenLogger,
+  KafkaTypegenObservedEvent,
+  KafkaTypegenObservabilityOptions,
+  KafkaTypegenObserver
+} from '../observability.js';
 export { createConfluentSchemaRegistryRuntimeClient } from './confluent-schema-registry-client.js';
 export { createRuntimeConsumer } from './consumer-client.js';
 export { createRuntimeClient } from './client.js';
