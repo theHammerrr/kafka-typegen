@@ -8,10 +8,14 @@ export type IntegrationAppFixtureName =
   | 'handler-error.ts'
   | 'happy-path.ts'
   | 'invalid-produce.ts'
+  | 'secure-happy-path.ts'
+  | 'secure-typecheck-app.ts'
   | 'typecheck-app.ts';
 
 export interface IntegrationAppTemplateValues {
   readonly kafkaBroker: string;
+  readonly kafkaPassword?: string;
+  readonly kafkaUsername?: string;
   readonly runId: string;
 }
 
@@ -26,5 +30,7 @@ export async function renderIntegrationAppFixture(
 
   return templateText
     .replaceAll('{{KAFKA_BROKER}}', values.kafkaBroker)
+    .replaceAll('{{KAFKA_PASSWORD}}', values.kafkaPassword ?? '')
+    .replaceAll('{{KAFKA_USERNAME}}', values.kafkaUsername ?? '')
     .replaceAll('{{RUN_ID}}', values.runId);
 }

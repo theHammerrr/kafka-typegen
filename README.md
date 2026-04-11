@@ -920,9 +920,12 @@ For Docker-backed end-to-end coverage with real Kafka and Schema Registry:
 ```bash
 pnpm build
 pnpm test:integration
+pnpm test:integration:secure
 ```
 
 `pnpm test:integration` requires a running Docker daemon. `pnpm test` stays fast and does not run the Testcontainers suite.
+
+`pnpm test:integration:secure` is a separate Kafka SASL/SCRAM suite that validates authenticated `sync --target kafka` and KafkaJS runtime usage against a secured broker. It does not currently cover end-to-end TLS certificate wiring because the public sync config only exposes `ssl: boolean`, not CA/key material.
 
 ## Current Scope
 

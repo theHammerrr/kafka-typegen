@@ -61,6 +61,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration:secure": "vitest run --config vitest.integration.secure.config.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "clean": "powershell -Command \"if (Test-Path dist) { Remove-Item -Recurse -Force dist }\""

@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a first-party KafkaJS runtime adapter with producer, consumer, and client helpers.
 - Added `kafka-typegen/runtime/advanced` for low-level runtime transport adapters and transport-facing
   types.
+- Added a dedicated secure Testcontainers suite for Kafka SASL/SCRAM coverage, including authenticated
+  `sync --target kafka` and KafkaJS runtime end-to-end tests.
 
 ### Changed
 

@@ -1,0 +1,75 @@
+// End-to-end secure fixture: validates authenticated KafkaJS produce/consume,
+// decoded payload contents, generated event names, and native shutdown methods.
+import { Kafka } from 'kafkajs';
+import { createKafkaJsRuntimeClient } from 'kafka-typegen/runtime/kafkajs';
+import { EventNames, createClient } from './generated/kafka/index.js';
+
+const kafka = new Kafka({
+  brokers: ['{{KAFKA_BROKER}}'],
+  clientId: '{{RUN_ID}}-secure-happy-path',
+  sasl: {
+    mechanism: 'scram-sha-256',
+    password: '{{KAFKA_PASSWORD}}',
+    username: '{{KAFKA_USERNAME}}'
+  }
+});
+
+const producerClient = kafka.producer();
+const consumerClient = kafka.consumer({
+  groupId: '{{RUN_ID}}-secure-happy-path-group'
+});
+
+const client = createClient(createKafkaJsRuntimeClient({
+  producer: producerClient,
+  consumer: consumerClient,
+  serialization: {
+    async deserialize(_metadata, message) {
+      return JSON.parse(new TextDecoder().decode(message.value ?? undefined));
+    },
+    async serialize(_metadata, payload) {
+      return {
+        value: new TextEncoder().encode(JSON.stringify(payload))
+      };
+    }
+  }
+}));
+
+await client.producer.connect();
+await client.consumer.connect();
+
+let resolveMessage: (() => void) | undefined;
+const received = new Promise<void>((resolve, reject) => {
+  resolveMessage = resolve;
+  setTimeout(() => reject(new Error('Timed out waiting for secure Kafka message.')), 60_000).unref();
+});
+
+await client.consumer.events.userCreated.on(async (message) => {
+  if (
+    message.event !== EventNames.UserCreated ||
+    message.headers?.['x-kafka-typegen-event'] !== EventNames.UserCreated ||
+    message.payload.email !== 'ada@example.com' ||
+    message.payload.id !== 'user-1' ||
+    message.payload.isAdmin !== true
+  ) {
+    throw new Error(`Unexpected secure Kafka message: ${JSON.stringify(message)}`);
+  }
+
+  resolveMessage?.();
+}, {
+  fromBeginning: true
+});
+
+await client.consumer.run();
+await client.producer.events.userCreated.send({
+  email: 'ada@example.com',
+  id: 'user-1',
+  isAdmin: true
+}, {
+  acks: -1
+});
+
+await received;
+await client.consumer.close();
+await client.producer.disconnect();
+
+console.log('SECURE_HAPPY_PATH_OK');
