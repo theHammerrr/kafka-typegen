@@ -8,6 +8,7 @@ import {
   createTypeGenerator,
   resolveConfig
 } from '../src/index.js';
+import { toTypeScriptType } from '../src/generator/avro-type-renderer.js';
 
 const schemaFixturesDir = resolvePath('tests', 'fixtures', 'schemas');
 const generatedFixturesDir = resolvePath('tests', 'fixtures', 'generated');
@@ -150,5 +151,47 @@ describe('type generation', () => {
     expect(contents).toContain("export const SchemaRegistryConfig = {\n  url: 'http://localhost:8081'\n} as const;");
     expect(contents).not.toContain('secret-password');
     expect(contents).not.toContain('registry-user');
+  });
+
+  it('renders Avro references, logical types, nested records, unions, arrays, maps, and enums', () => {
+    expect(toTypeScriptType('com.example.UserCreated')).toBe('UserCreated');
+    expect(toTypeScriptType({ logicalType: 'uuid', type: 'string' })).toBe('string');
+    expect(toTypeScriptType(['null', 'string'])).toBe('null | string');
+    expect(toTypeScriptType({
+      items: 'string',
+      type: 'array'
+    })).toBe('string[]');
+    expect(toTypeScriptType({
+      type: 'map',
+      values: 'long'
+    })).toBe('Record<string, number>');
+    expect(toTypeScriptType({
+      symbols: ['ACTIVE', 'DISABLED'],
+      type: 'enum'
+    })).toBe("'ACTIVE' | 'DISABLED'");
+    expect(toTypeScriptType({
+      fields: [
+        {
+          name: 'nestedId',
+          type: 'string'
+        }
+      ],
+      name: 'NestedRecord',
+      type: 'record'
+    })).toBe(`{
+  nestedId: string;
+}`);
+  });
+
+  it('fails loudly for unsupported Avro types', () => {
+    expect(() => toTypeScriptType({ type: { nested: true } })).toThrowError(
+      'Unsupported Avro complex type'
+    );
+    expect(() => toTypeScriptType(42)).toThrowError(
+      "Unsupported Avro type definition '42'."
+    );
+    expect(() => toTypeScriptType('not a valid type name')).toThrowError(
+      "Unsupported Avro type 'not a valid type name'."
+    );
   });
 });

@@ -120,6 +120,8 @@ With `generation.packageName` set, the generator emits:
 - an `index.ts` re-export file
 - a generated `package.json`
 
+That generated package is a **TypeScript source package**, not a precompiled JavaScript package. Keep `outputDir` inside your application source tree and include it in your app's TypeScript build so `@app/kafka` is compiled together with the rest of your code.
+
 That lets your application code import the generated API from one stable local package path:
 
 ```ts
@@ -440,6 +442,30 @@ const runtime = createPlatformaticRuntimeClient({
 
 const client = createClient(runtime);
 ```
+
+Consumer stream errors and rejected async handlers are surfaced through `onError`:
+
+```ts
+const runtime = createPlatformaticRuntimeClient({
+  producer,
+  consumer,
+  onError(error) {
+    console.error('Kafka consumer failure', error);
+  },
+  serialization: {
+    async serialize(_metadata, payload) {
+      return {
+        value: new TextEncoder().encode(JSON.stringify(payload))
+      };
+    },
+    async deserialize(_metadata, message) {
+      return JSON.parse(new TextDecoder().decode(message.value));
+    }
+  }
+});
+```
+
+For a given topic, repeated generated subscriptions must use the same consume options. Conflicting options are rejected instead of being ignored.
 
 ### Runtime Schema Registry Support
 

@@ -36,6 +36,7 @@ export type PlatformaticConsumerSubscribeOptions<TKey = Buffer> = Omit<
 
 export interface PlatformaticConsumerTransportOptions<TKey = Buffer> {
   readonly consumeOptions?: PlatformaticConsumerSubscribeOptions<TKey>;
+  readonly onError?: (error: unknown) => void;
 }
 
 export type PlatformaticRuntimeClientOptions<

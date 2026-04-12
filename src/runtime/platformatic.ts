@@ -58,7 +58,8 @@ export function createPlatformaticRuntimeClient<
     consumerTransport: createPlatformaticConsumerTransport(options.consumer, {
       ...(options.consumeOptions !== undefined
         ? { consumeOptions: options.consumeOptions }
-        : {})
+        : {}),
+      ...(options.onError !== undefined ? { onError: options.onError } : {})
     }),
     producerTransport: createPlatformaticProducerTransport(options.producer),
     ...(options.schemaRegistry !== undefined
