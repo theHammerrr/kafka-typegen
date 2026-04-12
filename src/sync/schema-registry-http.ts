@@ -24,9 +24,15 @@ export async function readJsonResponse(response: Response): Promise<unknown> {
     return undefined;
   }
 
+  const responseText = await response.text();
+
   if (!response.ok) {
-    throw new Error(`Schema Registry request failed with ${response.status} ${response.statusText}.`);
+    throw new Error(
+      `Schema Registry request failed with ${response.status} ${response.statusText}${
+        responseText.length > 0 ? `: ${responseText}` : ''
+      }`
+    );
   }
 
-  return response.json();
+  return responseText.length > 0 ? JSON.parse(responseText) : undefined;
 }

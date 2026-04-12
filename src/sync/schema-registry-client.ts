@@ -1,4 +1,7 @@
-import type { NormalizedSyncSchemaRegistryConfig } from '../config/index.js';
+import type {
+  NormalizedSyncSchemaRegistryConfig,
+  SchemaRegistryCompatibility
+} from '../config/index.js';
 
 import { buildSchemaRegistryHeaders, readJsonResponse } from './schema-registry-http.js';
 import type { DesiredSchemaRegistrySubject, RemoteSchemaRegistrySubject, SchemaRegistryClient } from './types.js';
@@ -27,6 +30,25 @@ export class HttpSchemaRegistryClient implements SchemaRegistryClient {
       },
       method: 'POST'
     });
+
+    await readJsonResponse(response);
+  }
+
+  public async updateSubjectCompatibility(
+    subjectName: string,
+    compatibility: SchemaRegistryCompatibility
+  ): Promise<void> {
+    const response = await fetch(
+      `${this.config.url}/config/${encodeURIComponent(subjectName)}`,
+      {
+        body: JSON.stringify({ compatibility }),
+        headers: {
+          ...buildSchemaRegistryHeaders(this.config),
+          'Content-Type': 'application/vnd.schemaregistry.v1+json'
+        },
+        method: 'PUT'
+      }
+    );
 
     await readJsonResponse(response);
   }

@@ -1,5 +1,13 @@
 import type { KafkaTypegenConfig, NormalizedSyncConfig } from './types.js';
 
+function normalizeSchemaRegistryOnDrift(config: KafkaTypegenConfig): 'fail' | 'ignore' | 'register' {
+  if (config.sync?.schemaRegistry?.onDrift !== undefined) {
+    return config.sync.schemaRegistry.onDrift;
+  }
+
+  return config.sync?.schemaRegistry?.failOnDrift === true ? 'fail' : 'register';
+}
+
 export function normalizeSyncConfig(config: KafkaTypegenConfig): NormalizedSyncConfig | undefined {
   return {
     ...(config.sync?.kafka !== undefined
@@ -16,8 +24,11 @@ export function normalizeSyncConfig(config: KafkaTypegenConfig): NormalizedSyncC
     ...(config.schemaRegistry !== undefined
       ? {
           schemaRegistry: {
-            failOnDrift: config.sync?.schemaRegistry?.failOnDrift ?? false,
+            onDrift: normalizeSchemaRegistryOnDrift(config),
             url: config.schemaRegistry.url,
+            ...(config.sync?.schemaRegistry?.compatibility !== undefined
+              ? { compatibility: config.sync.schemaRegistry.compatibility }
+              : {}),
             ...(config.schemaRegistry.auth !== undefined
               ? { auth: config.schemaRegistry.auth }
               : {})

@@ -58,6 +58,18 @@ export function validateSemanticConfig(config: KafkaTypegenConfig): void {
     );
   }
 
+  if (
+    config.sync?.schemaRegistry?.failOnDrift !== undefined &&
+    config.sync.schemaRegistry.onDrift !== undefined
+  ) {
+    issues.push(
+      buildValidationIssue(
+        ['sync', 'schemaRegistry', 'onDrift'],
+        'Use either sync.schemaRegistry.onDrift or sync.schemaRegistry.failOnDrift, not both.'
+      )
+    );
+  }
+
   if (issues.length > 0) {
     throw new ConfigValidationError(issues);
   }

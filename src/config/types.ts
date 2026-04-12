@@ -1,5 +1,16 @@
 export type RuntimeTransport = '@platformatic/kafka' | 'kafkajs';
 
+export type SchemaRegistryCompatibility =
+  | 'BACKWARD'
+  | 'BACKWARD_TRANSITIVE'
+  | 'FORWARD'
+  | 'FORWARD_TRANSITIVE'
+  | 'FULL'
+  | 'FULL_TRANSITIVE'
+  | 'NONE';
+
+export type SchemaRegistryDriftAction = 'fail' | 'ignore' | 'register';
+
 export type SubjectNameStrategy = 'event-name' | 'topic-name' | 'topic-event';
 
 export interface KafkaTypegenSchemaRegistryAuthConfig {
@@ -34,7 +45,9 @@ export interface KafkaTypegenSyncKafkaConfig {
 }
 
 export interface KafkaTypegenSyncSchemaRegistryConfig {
+  readonly compatibility?: SchemaRegistryCompatibility;
   readonly failOnDrift?: boolean;
+  readonly onDrift?: SchemaRegistryDriftAction;
 }
 
 export interface KafkaTypegenSyncConfig {
@@ -146,7 +159,8 @@ export interface NormalizedSyncKafkaConfig {
 
 export interface NormalizedSyncSchemaRegistryConfig {
   readonly auth?: KafkaTypegenSchemaRegistryAuthConfig;
-  readonly failOnDrift: boolean;
+  readonly compatibility?: SchemaRegistryCompatibility;
+  readonly onDrift: SchemaRegistryDriftAction;
   readonly url: string;
 }
 

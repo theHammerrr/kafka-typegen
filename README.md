@@ -266,7 +266,15 @@ interface KafkaTypegenConfig {
       failOnDrift?: boolean;
     };
     schemaRegistry?: {
-      failOnDrift?: boolean;
+      onDrift?: 'register' | 'fail' | 'ignore';
+      compatibility?:
+        | 'BACKWARD'
+        | 'BACKWARD_TRANSITIVE'
+        | 'FORWARD'
+        | 'FORWARD_TRANSITIVE'
+        | 'FULL'
+        | 'FULL_TRANSITIVE'
+        | 'NONE';
     };
   };
   generation?: {
@@ -319,6 +327,9 @@ interface KafkaTypegenConfig {
 - `sync.kafka` config is used only by the `sync` CLI command.
 - `schemaRegistry` is the single source of truth for Schema Registry connection details.
 - `sync.schemaRegistry` controls registry sync policy only.
+- `sync.schemaRegistry.onDrift` defaults to `register`, so `sync --apply` registers a new subject version when an existing schema changes.
+- `sync.schemaRegistry.compatibility`, when set, updates each subject's Schema Registry compatibility policy before registration. If Schema Registry rejects an incompatible schema, `sync --apply` fails with that registry error.
+- Legacy `sync.schemaRegistry.failOnDrift: true` is still accepted as an alias for `onDrift: 'fail'`, but new configs should use `onDrift`.
 - If `sync.kafka` is configured, every topic must provide `sync.partitions` and `sync.replicationFactor`.
 
 ## Avro Type Support
@@ -364,7 +375,8 @@ export default defineConfig({
       clientId: 'kafka-typegen-sync'
     },
     schemaRegistry: {
-      failOnDrift: true
+      onDrift: 'register',
+      compatibility: 'BACKWARD'
     }
   },
   sources: {
@@ -479,6 +491,22 @@ const runtime = createPlatformaticRuntimeClient({
   }
 });
 ```
+
+### Schema Evolution Workflow
+
+When you edit an existing `.avsc` file:
+
+1. Run `kafka-typegen generate --config ./kafka-typegen.config.mjs`.
+2. Run `kafka-typegen sync --config ./kafka-typegen.config.mjs` to review the planned Schema Registry update.
+3. Run `kafka-typegen sync --config ./kafka-typegen.config.mjs --apply` to register a new subject version.
+
+Recommended Avro evolution pattern:
+
+- To add a field, prefer a nullable field with a default, or a required field with a valid default value.
+- To remove a required field, first make it optional/nullable and deploy that transition before removing it later.
+- To change optional to required, first ensure all producers always populate the field, then tighten the schema in a later version if your compatibility mode allows it.
+
+Schema Registry compatibility modes such as `BACKWARD` and `FULL` are enforced by Schema Registry itself. `kafka-typegen sync --apply` does not bypass those checks; it surfaces the registry error if a new schema version is rejected.
 
 For a given topic, repeated generated subscriptions must use the same consume options. Conflicting options are rejected instead of being ignored.
 

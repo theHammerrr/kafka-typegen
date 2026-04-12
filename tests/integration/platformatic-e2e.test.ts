@@ -129,6 +129,64 @@ describe('testcontainers integration', () => {
     expect(registryDriftResult.exitCode).toBe(1);
     expect(registryDriftResult.stderr).toContain('Schema Registry sync detected subject drift');
   });
+
+  it('registers a new schema version on compatible subject drift during apply', async () => {
+    const workspace = await createWorkspace(createConfigText());
+    const firstApplyResult = await runCliCommand(workspace, ['sync', '--apply']);
+    expect(firstApplyResult.exitCode).toBe(0);
+
+    const evolvedWorkspace = await createSchemaEvolutionWorkspace(
+      createEvolutionConfigText({
+        compatibility: 'BACKWARD',
+        onDrift: 'register'
+      }),
+      createCompatibleUserCreatedSchema()
+    );
+    const driftDryRunResult = await runCliCommand(evolvedWorkspace, ['sync', '--json']);
+    expect(driftDryRunResult.exitCode).toBe(0);
+    const parsedDriftPlan = JSON.parse(driftDryRunResult.stdout) as {
+      operations: Array<{ action: string; target: string }>;
+    };
+    expect(parsedDriftPlan.operations).toEqual([
+      expect.objectContaining({ action: 'update', target: 'registry' })
+    ]);
+    expect(driftDryRunResult.stdout).toContain('Compatibility BACKWARD will be applied.');
+
+    const evolutionApplyResult = await runCliCommand(evolvedWorkspace, ['sync', '--apply']);
+    expect(evolutionApplyResult.exitCode).toBe(0);
+    expect(evolutionApplyResult.stdout).toContain('[registry] UPDATE user.events-user.created');
+    expect(evolutionApplyResult.stdout).toContain('Compatibility BACKWARD was applied.');
+
+    const noDriftResult = await runCliCommand(evolvedWorkspace, ['sync', '--json']);
+    expect(noDriftResult.exitCode).toBe(0);
+    const parsedNoDrift = JSON.parse(noDriftResult.stdout) as {
+      operations: Array<{ action: string; target: string }>;
+    };
+    expect(
+      parsedNoDrift.operations.filter((operation) => operation.target === 'registry')
+    ).toEqual([expect.objectContaining({ action: 'noop' })]);
+  });
+
+  it('surfaces Schema Registry compatibility failures on incompatible evolution', async () => {
+    const workspace = await createWorkspace(createConfigText());
+    const firstApplyResult = await runCliCommand(workspace, ['sync', '--apply']);
+    expect(firstApplyResult.exitCode).toBe(0);
+
+    const evolvedWorkspace = await createSchemaEvolutionWorkspace(
+      createEvolutionConfigText({
+        compatibility: 'FULL',
+        onDrift: 'register'
+      }),
+      createIncompatibleUserCreatedSchema()
+    );
+    const evolutionApplyResult = await runCliCommand(evolvedWorkspace, ['sync', '--apply']);
+
+    expect(evolutionApplyResult.exitCode).toBe(1);
+    expect(evolutionApplyResult.stderr).toContain(
+      "Failed to register Schema Registry subject 'user.events-user.created' for event 'user.created'"
+    );
+    expect(evolutionApplyResult.stderr).toContain('Schema Registry request failed');
+  });
 });
 
 async function createWorkspace(
@@ -167,6 +225,26 @@ async function createBuiltWorkspace(
       `Generated workspace build failed.\nstdout:\n${buildResult.stdout}\nstderr:\n${buildResult.stderr}`
     );
   }
+
+  return workspace;
+}
+
+async function createSchemaEvolutionWorkspace(
+  configContents: string,
+  userCreatedSchemaContents: string
+): Promise<string> {
+  const workspace = await createIntegrationWorkspace(configContents, {
+    'typecheck-app.ts': createTypecheckSource(),
+    '../schemas/user-created.avsc': userCreatedSchemaContents
+  });
+  workspaces.push(workspace);
+
+  const generateResult = await runCliCommand(workspace, [
+    'generate',
+    '--config',
+    'kafka-typegen.config.mjs'
+  ]);
+  expect(generateResult.exitCode).toBe(0);
 
   return workspace;
 }
@@ -226,6 +304,42 @@ function createConfigText(options: {
         {
           name: 'user.updated',
           schemaPath: './user-updated.avsc'
+        }
+      ]
+    }
+  ]
+};
+`;
+}
+
+function createEvolutionConfigText(options: {
+  compatibility: 'BACKWARD' | 'FULL';
+  onDrift: 'register';
+}): string {
+  return `export default {
+  outputDir: './src/generated/kafka',
+  runtime: {
+    transport: '@platformatic/kafka'
+  },
+  schemaRegistry: {
+    url: '${environment.schemaRegistryUrl}'
+  },
+  sync: {
+    schemaRegistry: {
+      compatibility: '${options.compatibility}',
+      onDrift: '${options.onDrift}'
+    }
+  },
+  sources: {
+    rootDir: './schemas'
+  },
+  topics: [
+    {
+      name: 'user.events',
+      events: [
+        {
+          name: 'user.created',
+          schemaPath: './user-created.avsc'
         }
       ]
     }
@@ -607,4 +721,40 @@ try {
   await consumer.close(true);
 }
 `;
+}
+
+function createCompatibleUserCreatedSchema(): string {
+  return JSON.stringify(
+    {
+      fields: [
+        { name: 'id', type: 'string' },
+        { name: 'email', type: 'string' },
+        { name: 'isAdmin', type: 'boolean' },
+        { default: null, name: 'displayName', type: ['null', 'string'] }
+      ],
+      name: 'UserCreated',
+      namespace: 'com.example.users',
+      type: 'record'
+    },
+    null,
+    2
+  );
+}
+
+function createIncompatibleUserCreatedSchema(): string {
+  return JSON.stringify(
+    {
+      fields: [
+        { name: 'id', type: 'string' },
+        { name: 'email', type: 'string' },
+        { name: 'isAdmin', type: 'boolean' },
+        { name: 'displayName', type: 'string' }
+      ],
+      name: 'UserCreated',
+      namespace: 'com.example.users',
+      type: 'record'
+    },
+    null,
+    2
+  );
 }

@@ -29,5 +29,7 @@ export {
   type NormalizedTopicSyncConfig,
   type NormalizedTopicConfig,
   type RuntimeTransport,
+  type SchemaRegistryCompatibility,
+  type SchemaRegistryDriftAction,
   type SubjectNameStrategy
 } from './types.js';
