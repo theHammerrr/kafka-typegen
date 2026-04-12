@@ -4,6 +4,7 @@ import type {
   KafkaJsConsumerSubscribeOptions,
   KafkaJsConsumerTransportOptions
 } from './kafkajs-types.js';
+import { bindKafkaJsCrashHandler } from './kafkajs-consumer-events.js';
 import {
   buildKafkaJsConsumerOptionsSignature,
   reportKafkaJsConsumerError
@@ -19,7 +20,6 @@ export type KafkaJsConsumerTransport = RuntimeTransportConsumer<
   KafkaJsConsumerSubscribeOptions
 > & {
   run(options?: KafkaJsConsumerRunOptions): Promise<void>;
-  stop(): Promise<void>;
 };
 
 interface KafkaJsTopicSubscription {
@@ -27,32 +27,27 @@ interface KafkaJsTopicSubscription {
   readonly optionsSignature: string;
 }
 
-interface KafkaJsConsumerEventSource {
-  readonly events?: {
-    readonly CRASH?: string;
-  };
-  on?: (
-    eventName: string,
-    listener: (event: { payload?: { error?: unknown } }) => void
-  ) => unknown;
-}
-
 export function createKafkaJsConsumerTransport(
   consumer: KafkaJsConsumerLike,
   options: KafkaJsConsumerTransportOptions = {}
 ): KafkaJsConsumerTransport {
   const subscriptionsByTopic = new Map<string, KafkaJsTopicSubscription>();
-  const crashEvent = (consumer as KafkaJsConsumerEventSource).events?.CRASH;
-  const nativeOn = (consumer as KafkaJsConsumerEventSource).on?.bind(consumer);
   let isRunning = false;
 
-  if (crashEvent !== undefined && nativeOn !== undefined) {
-    nativeOn(crashEvent, (event) => {
-      reportKafkaJsConsumerError(event.payload?.error ?? event, options.onError);
-    });
+  async function stopConsumer(): Promise<void> {
+    if (isRunning) {
+      await consumer.stop();
+      isRunning = false;
+    }
   }
 
+  bindKafkaJsCrashHandler(consumer, options);
+
   return {
+    async close() {
+      await stopConsumer();
+      await consumer.disconnect?.();
+    },
     async onTopic(topicName, handler, subscribeOptions) {
       const optionsSignature = buildKafkaJsConsumerOptionsSignature(subscribeOptions);
       const existingSubscription = subscriptionsByTopic.get(topicName);
@@ -107,8 +102,7 @@ export function createKafkaJsConsumerTransport(
       });
     },
     async stop() {
-      await consumer.stop();
-      isRunning = false;
+      await stopConsumer();
     }
   };
 }

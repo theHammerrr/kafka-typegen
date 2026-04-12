@@ -3,6 +3,7 @@ import { RUNTIME_EVENT_HEADER } from './producer-runtime.js';
 import type {
   ResolvedRuntimeClientOptions,
   RuntimeConsumer,
+  RuntimeConsumerCloseOptions,
   RuntimeConsumerMessage,
   RuntimeEventMetadata
 } from './types.js';
@@ -15,6 +16,15 @@ export class DefaultRuntimeConsumer<TSubscriptionOptions = unknown>
       TSubscriptionOptions
     >
   ) {}
+
+  public async close(options?: RuntimeConsumerCloseOptions): Promise<void> {
+    if (this.options.consumerTransport.close !== undefined) {
+      await this.options.consumerTransport.close(options);
+      return;
+    }
+
+    await this.stop();
+  }
 
   public async on<TPayload>(
     metadata: RuntimeEventMetadata,
@@ -52,5 +62,9 @@ export class DefaultRuntimeConsumer<TSubscriptionOptions = unknown>
       const payload = await this.options.serialization.deserialize<TPayload>(metadata, message);
       await handler(toConsumerMessage(metadata, message, payload));
     }, options);
+  }
+
+  public async stop(): Promise<void> {
+    await this.options.consumerTransport.stop?.();
   }
 }

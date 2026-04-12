@@ -46,4 +46,4 @@ if (errorMessage !== 'handler failed') {
 
 console.log('HANDLER_ERROR:' + errorMessage);
 await client.producer.close();
-await client.consumer.close(true);
+await client.consumer.close({ force: true });

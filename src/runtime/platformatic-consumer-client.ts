@@ -16,7 +16,10 @@ type PlatformaticConsumerEventSource = {
   on?: (eventName: string | symbol, listener: (...args: unknown[]) => void) => unknown;
 };
 
-export type PlatformaticRuntimeConsumer<TConsumer = PlatformaticConsumerLike> = TConsumer &
+export type PlatformaticRuntimeConsumer<TConsumer = PlatformaticConsumerLike> = Omit<
+  TConsumer,
+  'close'
+> &
   RuntimeConsumer<
     TConsumer extends PlatformaticConsumerLike<infer TKey>
       ? PlatformaticConsumerSubscribeOptions<TKey>
@@ -76,6 +79,7 @@ export function toPlatformaticRuntimeConsumer<
   const nativeOn = (consumer as PlatformaticConsumerEventSource).on?.bind(consumer);
 
   return createRuntimeClientProxy(consumer, {
+    close: runtimeConsumer.close.bind(runtimeConsumer),
     on: ((
       eventOrMetadata: unknown,
       handler: unknown,
@@ -91,6 +95,7 @@ export function toPlatformaticRuntimeConsumer<
             eventOrMetadata as string | symbol,
             handler as (...args: unknown[]) => void
           )) as PlatformaticRuntimeConsumer<TConsumer>['on'],
-    onTopic: runtimeConsumer.onTopic.bind(runtimeConsumer)
+    onTopic: runtimeConsumer.onTopic.bind(runtimeConsumer),
+    stop: runtimeConsumer.stop.bind(runtimeConsumer)
   });
 }

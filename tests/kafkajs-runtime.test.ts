@@ -355,4 +355,21 @@ describe('KafkaJS runtime adapter', () => {
       topicName: 'user.events'
     });
   });
+
+  it('closes KafkaJS consumers by stopping consumption and disconnecting the native client', async () => {
+    const consumer = new MockKafkaJsConsumer();
+    const runtimeConsumer = createKafkaJsRuntimeConsumer({
+      consumer,
+      serialization: createSerialization()
+    });
+
+    await runtimeConsumer.on(userCreatedMetadata, async () => {}, {
+      fromBeginning: true
+    });
+    await runtimeConsumer.run();
+    await runtimeConsumer.close();
+
+    expect(consumer.stop).toHaveBeenCalledTimes(1);
+    expect(consumer.disconnect).toHaveBeenCalledTimes(1);
+  });
 });

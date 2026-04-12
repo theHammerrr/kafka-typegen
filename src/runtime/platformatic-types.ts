@@ -18,11 +18,15 @@ export type PlatformaticProducerLike<TKey = Buffer> = Pick<
 export type PlatformaticConsumerLike<TKey = Buffer> = Pick<
   Consumer<TKey, Buffer, Buffer, Buffer>,
   'consume'
->;
+> &
+  Partial<Pick<Consumer<TKey, Buffer, Buffer, Buffer>, 'close'>>;
 export type PlatformaticMessage<TKey = unknown> = Message<TKey, Buffer, Buffer, Buffer> & {
   readonly schemaId?: string | number;
 };
-export type PlatformaticMessagesStream<TKey = unknown> = Pick<MessagesStream<TKey, Buffer, Buffer, Buffer>, 'on'>;
+export type PlatformaticMessagesStream<TKey = unknown> = Pick<
+  MessagesStream<TKey, Buffer, Buffer, Buffer>,
+  'close' | 'on'
+>;
 
 export type PlatformaticProducerSendOptions<TKey = Buffer> = Omit<
   SendOptions<TKey, Buffer, Buffer, Buffer>,
