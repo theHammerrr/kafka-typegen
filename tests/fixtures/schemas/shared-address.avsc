@@ -1,0 +1,11 @@
+{
+  "type": "record",
+  "name": "SharedAddress",
+  "namespace": "com.example.users",
+  "fields": [
+    {
+      "name": "street",
+      "type": "string"
+    }
+  ]
+}

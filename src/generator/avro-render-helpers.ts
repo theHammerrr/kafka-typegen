@@ -51,12 +51,15 @@ export function renderLogicalType(
 ): string {
   switch (logicalType) {
     case 'date':
+      return 'AvroDate';
     case 'time-millis':
+      return 'AvroTimeMillis';
     case 'timestamp-micros':
+      return 'AvroTimestampMicros';
     case 'timestamp-millis':
-      return 'number';
+      return 'AvroTimestampMillis';
     case 'decimal':
-      return 'Uint8Array';
+      return 'AvroDecimal';
     case 'uuid':
       return 'string';
     default:

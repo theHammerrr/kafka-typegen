@@ -342,17 +342,23 @@ Supported schema constructs:
 - arrays and maps
 - inline nested records
 - named nested `record`, `enum`, and `fixed` declarations, including references by short or fully-qualified name inside the same schema file
+- cross-file references to top-level named records, including short and fully-qualified names when the referenced schema is part of the same generated catalog
+- recursive references to a top-level record from its own fields
 - logical types:
   - `uuid` -> `string`
-  - `date`, `time-millis`, `timestamp-millis`, `timestamp-micros` -> `number`
-  - `decimal` -> `Uint8Array`
+  - `date` -> `AvroDate`
+  - `time-millis` -> `AvroTimeMillis`
+  - `timestamp-millis` -> `AvroTimestampMillis`
+  - `timestamp-micros` -> `AvroTimestampMicros`
+  - `decimal` -> `AvroDecimal`
 
 Current limitations:
 
 - the schema root must be a `record`
-- cross-file Avro named references are not resolved yet
-- `long` and time/date logical types are currently represented as `number`, not `bigint` or `Date`
-- `decimal` is represented as raw `Uint8Array`
+- cross-file references require the referenced schema to be included in the same config/catalog run
+- `long` is currently represented as `number`, not `bigint`
+- `AvroDate`, `AvroTimeMillis`, `AvroTimestampMillis`, and `AvroTimestampMicros` are numeric aliases, not `Date` objects
+- `AvroDecimal` is currently a `Uint8Array` alias
 - unsupported or malformed schema shapes fail generation with an explicit error instead of falling back to `unknown`
 
 ### Sync Config Example

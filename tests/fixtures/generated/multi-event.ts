@@ -2,6 +2,16 @@
 
 import type { RuntimeClient, RuntimeConsumer, RuntimeEventMetadata, RuntimeProducer } from 'kafka-typegen/runtime/kafkajs';
 
+export type AvroDate = number;
+
+export type AvroTimeMillis = number;
+
+export type AvroTimestampMicros = number;
+
+export type AvroTimestampMillis = number;
+
+export type AvroDecimal = Uint8Array;
+
 export interface UserCreatedPayload {
   id: string;
   email: string;

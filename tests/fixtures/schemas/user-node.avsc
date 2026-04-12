@@ -1,0 +1,17 @@
+{
+  "type": "record",
+  "name": "UserNode",
+  "fields": [
+    {
+      "name": "id",
+      "type": "string"
+    },
+    {
+      "name": "next",
+      "type": [
+        "null",
+        "UserNode"
+      ]
+    }
+  ]
+}

@@ -1,29 +1,40 @@
 import type { EventCatalog } from '../catalog/index.js';
 
 import { collectAvroDeclarations } from './avro-declarations.js';
+import { AVRO_LOGICAL_TYPE_DECLARATIONS } from './avro-logical-types.js';
+import { collectCatalogAvroReferences } from './avro-reference-registry.js';
 import { toTypeScriptType } from './avro-type-renderer.js';
 import { formatLiteral, formatPropertyName, indent } from './render-utils.js';
 
 export function emitPayloadInterfaces(catalog: EventCatalog): string {
-  return catalog.events
-    .map((event) => {
-      const { declarations, references } = collectAvroDeclarations(
-        event.schema.rawSchema,
-        event.payloadTypeName
-      );
-      const fields = event.schema.fields.map(
-        (field) => `${formatPropertyName(field.name)}: ${toTypeScriptType(field.rawType, {
-          path: field.path,
-          references
-        })};`
-      );
+  const sharedReferences = collectCatalogAvroReferences(catalog);
+  const declarationsByBody = new Map<string, string>();
+  const payloadInterfaces = catalog.events.map((event) => {
+    const { declarations, references } = collectAvroDeclarations(
+      event.schema.rawSchema,
+      event.payloadTypeName,
+      sharedReferences
+    );
 
-      return [
-        ...declarations,
-        `export interface ${event.payloadTypeName} {\n${indent(fields.join('\n'))}\n}`
-      ].join('\n\n');
-    })
-    .join('\n\n');
+    for (const declaration of declarations) {
+      declarationsByBody.set(declaration, declaration);
+    }
+
+    const fields = event.schema.fields.map(
+      (field) => `${formatPropertyName(field.name)}: ${toTypeScriptType(field.rawType, {
+        path: field.path,
+        references
+      })};`
+    );
+
+    return `export interface ${event.payloadTypeName} {\n${indent(fields.join('\n'))}\n}`;
+  });
+
+  return [
+    ...AVRO_LOGICAL_TYPE_DECLARATIONS,
+    ...declarationsByBody.values(),
+    ...payloadInterfaces
+  ].join('\n\n');
 }
 
 export function emitEventUnion(catalog: EventCatalog): string {

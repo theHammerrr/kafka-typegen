@@ -29,8 +29,37 @@ export function registerNamedTypeReferences(
     typeof typeRecord.namespace === 'string' ? typeRecord.namespace : undefined,
     typeRecord.name
   )) {
+    const existingTargetName = references.get(referenceName);
+    if (
+      existingTargetName !== undefined &&
+      existingTargetName !== targetName
+    ) {
+      throw new Error(
+        `Conflicting Avro named type reference '${referenceName}' maps to both '${existingTargetName}' and '${targetName}'.`
+      );
+    }
+
     references.set(referenceName, targetName);
   }
+}
+
+function setNamedDeclaration(
+  declarationsByName: Map<string, string>,
+  typeName: string,
+  declaration: string
+): void {
+  const existingDeclaration = declarationsByName.get(typeName);
+
+  if (
+    existingDeclaration !== undefined &&
+    existingDeclaration !== declaration
+  ) {
+    throw new Error(
+      `Conflicting Avro named type declaration '${typeName}' was generated with incompatible definitions.`
+    );
+  }
+
+  declarationsByName.set(typeName, declaration);
 }
 
 export function emitEnumOrFixedDeclaration(
@@ -38,7 +67,8 @@ export function emitEnumOrFixedDeclaration(
   declarationsByName: Map<string, string>
 ): void {
   if (Array.isArray(typeRecord.symbols) && typeof typeRecord.name === 'string') {
-    declarationsByName.set(
+    setNamedDeclaration(
+      declarationsByName,
       typeRecord.name,
       `export type ${typeRecord.name} = ${typeRecord.symbols
         .map((symbol) => formatLiteral(String(symbol)))
@@ -47,6 +77,10 @@ export function emitEnumOrFixedDeclaration(
   }
 
   if (typeRecord.type === 'fixed' && typeof typeRecord.name === 'string') {
-    declarationsByName.set(typeRecord.name, `export type ${typeRecord.name} = Uint8Array;`);
+    setNamedDeclaration(
+      declarationsByName,
+      typeRecord.name,
+      `export type ${typeRecord.name} = Uint8Array;`
+    );
   }
 }
