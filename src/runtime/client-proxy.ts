@@ -1,4 +1,4 @@
-export function createPlatformaticClientProxy<
+export function createRuntimeClientProxy<
   TClient extends object,
   TOverrides extends object
 >(client: TClient, overrides: TOverrides): TClient & TOverrides {

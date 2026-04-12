@@ -321,7 +321,7 @@ interface KafkaTypegenConfig {
 - Event names must be unique across all topics.
 - `runtime.module` controls which runtime package the generated file imports its runtime types from.
 - If `runtime.module` is omitted:
-  - `kafkajs` defaults to `kafka-typegen/runtime`
+  - `kafkajs` defaults to `kafka-typegen/runtime/kafkajs`
   - `@platformatic/kafka` defaults to `kafka-typegen/runtime/platformatic`
 - `generation.typesFileName`, when set, controls the generated client filename. The generator also emits `index.ts` unless the filename is already `index.ts`.
 - `sync.kafka` config is used only by the `sync` CLI command.
@@ -404,11 +404,11 @@ export default defineConfig({
 
 ## Runtime Usage
 
-The generated client is transport-agnostic. It talks to a runtime interface, and this package ships two runtime entrypoints.
+The generated client is transport-agnostic. It talks to a runtime interface, and this package ships generic, KafkaJS, and Platformatic runtime entrypoints.
 
 ### Generic runtime
 
-Import from `kafka-typegen/runtime` for the runtime constructors, and from `kafka-typegen/runtime/advanced` for the low-level transport interfaces when you want to provide your own transport adapters:
+Import from `kafka-typegen/runtime` for the generic runtime constructors, and from `kafka-typegen/runtime/advanced` for the low-level transport interfaces when you want to provide your own transport adapters:
 
 ```ts
 import { createRuntimeClient } from 'kafka-typegen/runtime';
@@ -426,6 +426,69 @@ You provide:
 - or `schemaRegistry`, which can be either:
   - direct Confluent Schema Registry connection options
   - an already-created registry client that satisfies the runtime registry interface
+
+### KafkaJS runtime
+
+KafkaJS helpers are available from both `kafka-typegen/runtime` and `kafka-typegen/runtime/kafkajs`.
+
+```ts
+import { Kafka } from 'kafkajs';
+import { createKafkaJsRuntimeClient } from 'kafka-typegen/runtime';
+import { createClient } from './generated/kafka-client.js';
+
+const kafka = new Kafka({
+  brokers: ['localhost:9092'],
+  clientId: 'demo-app'
+});
+
+const runtime = createKafkaJsRuntimeClient({
+  producer: kafka.producer(),
+  consumer: kafka.consumer({
+    groupId: 'demo-app-group'
+  }),
+  schemaRegistry: {
+    url: 'http://localhost:8081'
+  },
+  runOptions: {
+    autoCommit: false
+  },
+  onError(error) {
+    console.error('KafkaJS consumer failure', error);
+  }
+});
+
+const client = createClient(runtime);
+
+await client.producer.connect();
+await client.consumer.connect();
+
+await client.consumer.events.userCreated.on(async (message) => {
+  console.log(message.payload.email);
+}, {
+  fromBeginning: true
+});
+
+await client.consumer.run();
+
+await client.producer.events.userCreated.send({
+  id: 'user_1',
+  email: 'ada@example.com',
+  isAdmin: true
+}, {
+  acks: -1
+});
+
+await client.consumer.stop();
+await client.consumer.disconnect();
+await client.producer.disconnect();
+```
+
+KafkaJS-specific behavior:
+
+- register generated consumer handlers before calling `consumer.run()`
+- repeated subscriptions to the same topic must use the same `fromBeginning` option
+- subscribing a new topic after `consumer.run()` has started is rejected
+- native KafkaJS methods like `connect`, `disconnect`, `stop`, `commitOffsets`, `pause`, `resume`, and `on` remain available on the generated wrapper
 
 ### Platformatic runtime
 
@@ -799,9 +862,13 @@ pnpm start
   - generic runtime interfaces
 - `kafka-typegen/runtime`
   - generic runtime client and runtime types
+  - KafkaJS and Platformatic high-level runtime helpers
 - `kafka-typegen/runtime/advanced`
   - low-level transport adapter interfaces
-  - Platformatic transport adapter builders
+  - KafkaJS and Platformatic transport adapter builders
+- `kafka-typegen/runtime/kafkajs`
+  - KafkaJS runtime adapter
+  - generic runtime types re-exported for generated imports
 - `kafka-typegen/runtime/platformatic`
   - Platformatic runtime adapter
   - generic runtime types re-exported for generated imports
