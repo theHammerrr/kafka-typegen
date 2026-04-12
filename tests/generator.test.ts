@@ -224,6 +224,134 @@ describe('type generation', () => {
 }`);
   });
 
+  it('emits payload aliases for top-level enum and fixed roots', async () => {
+    const output = await buildGeneratedOutput({
+      outputDir: './generated',
+      sources: {
+        rootDir: schemaFixturesDir
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.statusChanged',
+              schemaPath: './user-status.avsc'
+            },
+            {
+              name: 'user.sessionTokenIssued',
+              schemaPath: './session-token.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+    const contents =
+      output.files.find((file) => file.filePath === 'kafka-client.ts')
+        ?.contents ?? '';
+
+    expect(contents).toContain(`export type UserStatus = 'ACTIVE' | 'DISABLED';`);
+    expect(contents).toContain('export type UserStatusChangedPayload = UserStatus;');
+    expect(contents).toContain('export type SessionToken = Uint8Array;');
+    expect(contents).toContain('export type UserSessionTokenIssuedPayload = SessionToken;');
+  });
+
+  it('supports mixed top-level record, enum, and fixed roots deterministically', async () => {
+    const output = await buildGeneratedOutput({
+      outputDir: './generated',
+      sources: {
+        rootDir: schemaFixturesDir
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './user-created.avsc'
+            },
+            {
+              name: 'user.statusChanged',
+              schemaPath: './user-status.avsc'
+            },
+            {
+              name: 'user.sessionTokenIssued',
+              schemaPath: './session-token.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+    const contents =
+      output.files.find((file) => file.filePath === 'kafka-client.ts')
+        ?.contents ?? '';
+
+    expect(contents).toContain('export interface UserCreatedPayload {');
+    expect(contents).toContain('export type UserStatusChangedPayload = UserStatus;');
+    expect(contents).toContain('export type UserSessionTokenIssuedPayload = SessionToken;');
+  });
+
+  it('renders configured external Avro type mappings as TypeScript type expressions', async () => {
+    const output = await buildGeneratedOutput({
+      generation: {
+        avroExternalTypes: {
+          'com.external.ExternalAddress': "import('./external-types.js').ExternalAddress"
+        }
+      },
+      outputDir: './generated',
+      sources: {
+        rootDir: schemaFixturesDir
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.externalUser',
+              schemaPath: './external-user.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+    const contents =
+      output.files.find((file) => file.filePath === 'kafka-client.ts')
+        ?.contents ?? '';
+
+    expect(contents).toContain(
+      "address: import('./external-types.js').ExternalAddress;"
+    );
+  });
+
+  it('rejects configured external Avro type mappings that collide with generated names', async () => {
+    await expect(
+      buildGeneratedOutput({
+        generation: {
+          avroExternalTypes: {
+            'com.external.ExternalAddress': 'UserExternalUserPayload'
+          }
+        },
+        outputDir: './generated',
+        sources: {
+          rootDir: schemaFixturesDir
+        },
+        topics: [
+          {
+            events: [
+              {
+                name: 'user.externalUser',
+                schemaPath: './external-user.avsc'
+              }
+            ],
+            name: 'user.events'
+          }
+        ]
+      })
+    ).rejects.toThrow(
+      "Configured external Avro type 'com.external.ExternalAddress' collides with generated type 'UserExternalUserPayload'"
+    );
+  });
+
   it('renders Avro references, logical types, nested records, unions, arrays, maps, and enums', () => {
     expect(toTypeScriptType('com.example.UserCreated')).toBe('UserCreated');
     expect(toTypeScriptType({ logicalType: 'uuid', type: 'string' })).toBe('string');
@@ -255,6 +383,50 @@ describe('type generation', () => {
     })).toBe(`{
   nestedId: string;
 }`);
+  });
+
+  it('supports safe semantic rendering for Avro long without changing logical type aliases', async () => {
+    const output = await buildGeneratedOutput({
+      generation: {
+        avroSemanticMode: 'safe'
+      },
+      outputDir: './generated',
+      sources: {
+        rootDir: schemaFixturesDir
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.statsCaptured',
+              schemaPath: './user-stats.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+    const contents =
+      output.files.find((file) => file.filePath === 'kafka-client.ts')
+        ?.contents ?? '';
+
+    expect(contents).toContain('count: bigint;');
+    expect(contents).toContain('capturedAt: AvroTimestampMillis;');
+  });
+
+  it('supports safe semantic rendering in direct type conversion helpers', () => {
+    expect(
+      toTypeScriptType('long', { path: 'schema', semanticMode: 'safe' })
+    ).toBe('bigint');
+    expect(
+      toTypeScriptType(
+        {
+          type: 'map',
+          values: 'long'
+        },
+        { path: 'schema', semanticMode: 'safe' }
+      )
+    ).toBe('Record<string, bigint>');
   });
 
   it('fails loudly for unsupported Avro types', () => {

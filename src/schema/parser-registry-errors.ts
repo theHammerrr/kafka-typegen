@@ -1,16 +1,16 @@
 import { SchemaParseError } from './errors.js';
-import type { ParsedRecordSchemaInput } from './parser-record.js';
+import type { ParsedNamedSchemaInput } from './parser-root.js';
 
 const MISSING_TYPE_MESSAGE = 'undefined type name:';
 
-function toSchemaFullName(input: ParsedRecordSchemaInput): string {
-  return typeof input.rawSchemaRecord.namespace === 'string'
-    ? `${input.rawSchemaRecord.namespace}.${String(input.rawSchemaRecord.name)}`
-    : String(input.rawSchemaRecord.name);
+function toSchemaFullName(input: ParsedNamedSchemaInput): string {
+  return typeof input.rawSchemaRoot.namespace === 'string'
+    ? `${input.rawSchemaRoot.namespace}.${String(input.rawSchemaRoot.name)}`
+    : String(input.rawSchemaRoot.name);
 }
 
 export function assertUniqueRootNames(
-  inputs: readonly ParsedRecordSchemaInput[]
+  inputs: readonly ParsedNamedSchemaInput[]
 ): void {
   const seenByFullName = new Map<string, string>();
 

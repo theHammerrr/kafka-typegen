@@ -278,6 +278,8 @@ interface KafkaTypegenConfig {
     };
   };
   generation?: {
+    avroExternalTypes?: Record<string, string>;
+    avroSemanticMode?: 'default' | 'safe';
     typesFileName?: string;
   };
   naming?: {
@@ -324,6 +326,8 @@ interface KafkaTypegenConfig {
   - `kafkajs` defaults to `kafka-typegen/runtime/kafkajs`
   - `@platformatic/kafka` defaults to `kafka-typegen/runtime/platformatic`
 - `generation.typesFileName`, when set, controls the generated client filename. The generator also emits `index.ts` unless the filename is already `index.ts`.
+- `generation.avroExternalTypes` maps Avro named types to TypeScript type expressions for references that are not generated in the same catalog run. Values can be bare type names or expressions such as `import('./shared-types.js').Address`.
+- `generation.avroSemanticMode` defaults to `default`. Use `safe` to render plain Avro `long` values as `bigint` while keeping the existing logical-type aliases.
 - `sync.kafka` config is used only by the `sync` CLI command.
 - `schemaRegistry` is the single source of truth for Schema Registry connection details.
 - `sync.schemaRegistry` controls registry sync policy only.
@@ -336,7 +340,7 @@ interface KafkaTypegenConfig {
 
 Supported schema constructs:
 
-- top-level `record` schemas
+- top-level named `record`, `enum`, and `fixed` schemas
 - primitive types: `null`, `boolean`, `int`, `long`, `float`, `double`, `bytes`, `string`
 - unions, including nullable unions like `['null', 'string']`
 - arrays and maps
@@ -354,12 +358,41 @@ Supported schema constructs:
 
 Current limitations:
 
-- the schema root must be a `record`
-- cross-file references require the referenced schema to be included in the same config/catalog run
-- `long` is currently represented as `number`, not `bigint`
+- cross-file references require the referenced schema to be included in the same config/catalog run unless an explicit `generation.avroExternalTypes` mapping is configured
+- `long` is represented as `number` in the default semantic mode and `bigint` in `generation.avroSemanticMode: 'safe'`
 - `AvroDate`, `AvroTimeMillis`, `AvroTimestampMillis`, and `AvroTimestampMicros` are numeric aliases, not `Date` objects
 - `AvroDecimal` is currently a `Uint8Array` alias
 - unsupported or malformed schema shapes fail generation with an explicit error instead of falling back to `unknown`
+
+### External Avro Type Mappings
+
+Use `generation.avroExternalTypes` when a schema references a named Avro type that is intentionally not part of the current generation run:
+
+```js
+import { defineConfig } from 'kafka-typegen';
+
+export default defineConfig({
+  outputDir: './generated',
+  generation: {
+    avroExternalTypes: {
+      'com.external.Address': "import('./shared-types.js').Address"
+    }
+  },
+  topics: [
+    {
+      name: 'user.events',
+      events: [
+        {
+          name: 'user.created',
+          schemaPath: './user-created.avsc'
+        }
+      ]
+    }
+  ]
+});
+```
+
+This is a TypeScript type-resolution feature only. It does not load remote Avro schemas or fetch types from Schema Registry.
 
 ### Sync Config Example
 

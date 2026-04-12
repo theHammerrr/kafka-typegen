@@ -6,7 +6,15 @@ import {
   parseSchemasWithSharedRegistry,
   parseSchemaWithRegistry
 } from './parser-registry.js';
-import type { EventSchemaDefinition, EventSchemaInput, EventSchemaLoader, ParsedSchema, SchemaLoadResult, SchemaParser } from './types.js';
+import type {
+  EventSchemaDefinition,
+  EventSchemaInput,
+  EventSchemaLoader,
+  EventSchemaLoadOptions,
+  ParsedSchema,
+  SchemaLoadResult,
+  SchemaParser
+} from './types.js';
 
 export class AvroSchemaParser implements SchemaParser {
   public async parse(result: SchemaLoadResult): Promise<ParsedSchema> {
@@ -25,13 +33,19 @@ class DefaultEventSchemaLoader implements EventSchemaLoader {
     return { eventName: input.eventName, schema: parsedSchema, subjectName: input.subjectName, topicName: input.topicName };
   }
 
-  public async loadEventSchemas(events: readonly EventSchemaInput[] | readonly NormalizedEventConfig[]): Promise<readonly EventSchemaDefinition[]> {
+  public async loadEventSchemas(
+    events: readonly EventSchemaInput[] | readonly NormalizedEventConfig[],
+    options: EventSchemaLoadOptions = {}
+  ): Promise<readonly EventSchemaDefinition[]> {
     const schemaInputs = events.map((event) => toEventSchemaInput(event));
     const uniqueFilePaths = [...new Set(schemaInputs.map((input) => input.filePath))];
     const loadedSchemas = await Promise.all(
       uniqueFilePaths.map((filePath) => this.loader.load({ filePath }))
     );
-    const parsedSchemas = parseSchemasWithSharedRegistry(loadedSchemas);
+    const parsedSchemas = parseSchemasWithSharedRegistry(
+      loadedSchemas,
+      options.externalTypeMappings
+    );
     const schemasByPath = new Map(
       parsedSchemas.map((schema) => [schema.filePath, schema])
     );

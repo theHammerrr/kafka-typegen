@@ -1,14 +1,14 @@
 import avsc from 'avsc';
-import type { Type } from 'avsc';
+import type { Schema, Type } from 'avsc';
 
 import { SchemaParseError } from './errors.js';
 import type { ParsedSchema, SchemaLoadResult } from './types.js';
 import { normalizeField } from './field-format.js';
 import {
-  type ParsedRecordSchemaInput,
-  parseRecordSchema,
-  toRecordSchema
-} from './parser-record.js';
+  type ParsedNamedSchemaInput,
+  parseNamedSchema,
+  toNamedSchema
+} from './parser-root.js';
 import {
   assertUniqueRootNames,
   createUnresolvedSchemaError,
@@ -22,25 +22,28 @@ import {
 const { Type: AvroType } = avsc;
 
 interface PendingSchemaParse {
-  readonly input: ParsedRecordSchemaInput;
+  readonly input: ParsedNamedSchemaInput;
   readonly result: SchemaLoadResult;
 }
 
-function toParsedSchema(input: ParsedRecordSchemaInput, avroType: Type): ParsedSchema {
-  const recordName = input.rawSchemaRecord.name as string;
-  const fields = (input.rawSchemaRecord.fields as unknown[]).map((field) =>
-    normalizeField(recordName, field as Record<string, unknown>)
-  );
+function toParsedSchema(input: ParsedNamedSchemaInput, avroType: Type): ParsedSchema {
+  const schemaName = input.rawSchemaRoot.name as string;
+  const fields = input.rootType === 'record'
+    ? (input.rawSchemaRoot.fields as unknown[]).map((field) =>
+        normalizeField(schemaName, field as Record<string, unknown>)
+      )
+    : [];
 
   return {
     avroType,
     fields,
     filePath: input.filePath,
-    name: recordName,
-    ...(typeof input.rawSchemaRecord.namespace === 'string'
-      ? { namespace: input.rawSchemaRecord.namespace }
+    name: schemaName,
+    ...(typeof input.rawSchemaRoot.namespace === 'string'
+      ? { namespace: input.rawSchemaRoot.namespace }
       : {}),
-    rawSchema: input.rawSchemaRecord
+    rootType: input.rootType,
+    rawSchema: input.rawSchemaRoot
   };
 }
 
@@ -48,12 +51,12 @@ export function parseSchemaWithRegistry(
   result: SchemaLoadResult,
   registry?: Record<string, Type>
 ): ParsedSchema {
-  const input = parseRecordSchema(result);
+  const input = parseNamedSchema(result);
 
   try {
     const avroType = registry === undefined
-      ? AvroType.forSchema(toRecordSchema(input))
-      : AvroType.forSchema(toRecordSchema(input), { registry });
+      ? AvroType.forSchema(toNamedSchema(input))
+      : AvroType.forSchema(toNamedSchema(input), { registry });
 
     return toParsedSchema(input, avroType);
   } catch (error) {
@@ -66,12 +69,13 @@ export function parseSchemaWithRegistry(
 }
 
 export function parseSchemasWithSharedRegistry(
-  results: readonly SchemaLoadResult[]
+  results: readonly SchemaLoadResult[],
+  externalTypeMappings: Readonly<Record<string, string>> = {}
 ): readonly ParsedSchema[] {
-  const registry: Record<string, Type> = {};
+  const registry: Record<string, Type> = createSeededRegistry(externalTypeMappings);
   const parsedByPath = new Map<string, ParsedSchema>();
   const pending: PendingSchemaParse[] = results.map((result) => ({
-    input: parseRecordSchema(result),
+    input: parseNamedSchema(result),
     result
   }));
 
@@ -85,7 +89,7 @@ export function parseSchemasWithSharedRegistry(
       const registrySnapshot = cloneAvroRegistry(registry);
 
       try {
-        const avroType = AvroType.forSchema(toRecordSchema(entry.input), {
+        const avroType = AvroType.forSchema(toNamedSchema(entry.input), {
           registry
         });
 
@@ -113,4 +117,34 @@ export function parseSchemasWithSharedRegistry(
   }
 
   return results.map((result) => parsedByPath.get(result.filePath) as ParsedSchema);
+}
+
+function createSeededRegistry(
+  externalTypeMappings: Readonly<Record<string, string>>
+): Record<string, Type> {
+  const registry: Record<string, Type> = {};
+
+  for (const fullName of Object.keys(externalTypeMappings)) {
+    registry[fullName] = AvroType.forSchema(
+      toExternalPlaceholderSchema(fullName),
+      { registry }
+    );
+  }
+
+  return registry;
+}
+
+function toExternalPlaceholderSchema(fullName: string): Schema {
+  const segments = fullName.split('.');
+  const name = segments.at(-1) ?? fullName;
+  const namespace = segments.length > 1
+    ? segments.slice(0, -1).join('.')
+    : undefined;
+
+  return {
+    fields: [],
+    name,
+    ...(namespace !== undefined ? { namespace } : {}),
+    type: 'record'
+  } as Schema;
 }

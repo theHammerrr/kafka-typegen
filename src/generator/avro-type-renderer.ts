@@ -10,7 +10,7 @@ import {
 
 export function toTypeScriptType(
   avroType: unknown,
-  context: AvroTypeRenderContext = { path: 'schema' }
+  context: AvroTypeRenderContext = { path: 'schema', semanticMode: 'default' }
 ): string {
   if (typeof avroType === 'string') {
     return renderPrimitiveType(avroType, context);

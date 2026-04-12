@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a first-party KafkaJS runtime adapter with producer, consumer, and client helpers.
 - Added `kafka-typegen/runtime/advanced` for low-level runtime transport adapters and transport-facing
   types.
+- Added top-level Avro `enum` and `fixed` root support in schema parsing and type generation.
+- Added `generation.avroExternalTypes` for explicit external named-type mappings during generation.
+- Added `generation.avroSemanticMode: 'safe'` to render plain Avro `long` values as `bigint`.
 
 ### Changed
 

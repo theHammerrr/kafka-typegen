@@ -47,6 +47,7 @@ describe('schema parsing', () => {
     expect(parsedSchema.filePath).toBe(filePath);
     expect(parsedSchema.name).toBe('UserCreated');
     expect(parsedSchema.namespace).toBe('com.example.users');
+    expect(parsedSchema.rootType).toBe('record');
     expect(parsedSchema.fields).toEqual([
       {
         name: 'id',
@@ -69,6 +70,34 @@ describe('schema parsing', () => {
     ]);
   });
 
+  it('accepts top-level Avro enum roots', async () => {
+    const loader = new FileSystemSchemaLoader();
+    const parser = new AvroSchemaParser();
+    const filePath = join(fixturesDir, 'user-status.avsc');
+
+    const parsedSchema = await parser.parse(await loader.load({ filePath }));
+
+    expect(parsedSchema.filePath).toBe(filePath);
+    expect(parsedSchema.name).toBe('UserStatus');
+    expect(parsedSchema.namespace).toBe('com.example.users');
+    expect(parsedSchema.rootType).toBe('enum');
+    expect(parsedSchema.fields).toEqual([]);
+  });
+
+  it('accepts top-level Avro fixed roots', async () => {
+    const loader = new FileSystemSchemaLoader();
+    const parser = new AvroSchemaParser();
+    const filePath = join(fixturesDir, 'session-token.avsc');
+
+    const parsedSchema = await parser.parse(await loader.load({ filePath }));
+
+    expect(parsedSchema.filePath).toBe(filePath);
+    expect(parsedSchema.name).toBe('SessionToken');
+    expect(parsedSchema.namespace).toBe('com.example.users');
+    expect(parsedSchema.rootType).toBe('fixed');
+    expect(parsedSchema.fields).toEqual([]);
+  });
+
   it('rejects malformed JSON schema content', async () => {
     const loader = new FileSystemSchemaLoader();
     const parser = new AvroSchemaParser();
@@ -86,7 +115,27 @@ describe('schema parsing', () => {
     const filePath = join(fixturesDir, 'invalid-root.avsc');
 
     await expect(parser.parse(await loader.load({ filePath }))).rejects.toThrow(
-      "must define a top-level Avro record"
+      'must define a top-level Avro record, enum, or fixed'
+    );
+  });
+
+  it('rejects malformed top-level Avro enum roots', async () => {
+    const loader = new FileSystemSchemaLoader();
+    const parser = new AvroSchemaParser();
+    const filePath = join(fixturesDir, 'invalid-enum.avsc');
+
+    await expect(parser.parse(await loader.load({ filePath }))).rejects.toThrow(
+      "must define a 'symbols' array for the enum"
+    );
+  });
+
+  it('rejects malformed top-level Avro fixed roots', async () => {
+    const loader = new FileSystemSchemaLoader();
+    const parser = new AvroSchemaParser();
+    const filePath = join(fixturesDir, 'invalid-fixed.avsc');
+
+    await expect(parser.parse(await loader.load({ filePath }))).rejects.toThrow(
+      "must define a positive integer 'size' for the fixed type"
     );
   });
 });
@@ -211,6 +260,36 @@ describe('event schema integration', () => {
       createEventSchemaLoader().loadEventSchemas(normalizedConfig.events)
     ).rejects.toThrow(
       "Duplicate top-level Avro schema name 'com.example.users.UserCreated'"
+    );
+  });
+
+  it('rejects duplicate top-level Avro schema names across mixed root kinds', async () => {
+    const normalizedConfig = resolveConfig({
+      outputDir: './generated',
+      sources: {
+        rootDir: fixturesDir
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.statusEnum',
+              schemaPath: './user-status.avsc'
+            },
+            {
+              name: 'user.statusDuplicate',
+              schemaPath: './duplicate-user-status.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+
+    await expect(
+      createEventSchemaLoader().loadEventSchemas(normalizedConfig.events)
+    ).rejects.toThrow(
+      "Duplicate top-level Avro schema name 'com.example.users.UserStatus'"
     );
   });
 });

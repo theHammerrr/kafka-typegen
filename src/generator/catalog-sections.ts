@@ -9,32 +9,50 @@ import { formatLiteral, formatPropertyName, indent } from './render-utils.js';
 export function emitPayloadInterfaces(catalog: EventCatalog): string {
   const sharedReferences = collectCatalogAvroReferences(catalog);
   const declarationsByBody = new Map<string, string>();
-  const payloadInterfaces = catalog.events.map((event) => {
+  const payloadDeclarations = catalog.events.map((event) => {
     const { declarations, references } = collectAvroDeclarations(
       event.schema.rawSchema,
       event.payloadTypeName,
-      sharedReferences
+      sharedReferences,
+      catalog.config.generation.avroSemanticMode
     );
 
     for (const declaration of declarations) {
       declarationsByBody.set(declaration, declaration);
     }
 
-    const fields = event.schema.fields.map(
-      (field) => `${formatPropertyName(field.name)}: ${toTypeScriptType(field.rawType, {
-        path: field.path,
-        references
-      })};`
+    return emitEventPayloadDeclaration(
+      event,
+      references,
+      catalog.config.generation.avroSemanticMode
     );
-
-    return `export interface ${event.payloadTypeName} {\n${indent(fields.join('\n'))}\n}`;
   });
 
   return [
     ...AVRO_LOGICAL_TYPE_DECLARATIONS,
     ...declarationsByBody.values(),
-    ...payloadInterfaces
+    ...payloadDeclarations
   ].join('\n\n');
+}
+
+function emitEventPayloadDeclaration(
+  event: EventCatalog['events'][number],
+  references: Readonly<Record<string, string>>,
+  semanticMode: 'default' | 'safe'
+): string {
+  if (event.schema.rootType === 'record') {
+    const fields = event.schema.fields.map(
+      (field) => `${formatPropertyName(field.name)}: ${toTypeScriptType(field.rawType, {
+        path: field.path,
+        references,
+        semanticMode
+      })};`
+    );
+
+    return `export interface ${event.payloadTypeName} {\n${indent(fields.join('\n'))}\n}`;
+  }
+
+  return `export type ${event.payloadTypeName} = ${event.schema.name};`;
 }
 
 export function emitEventUnion(catalog: EventCatalog): string {

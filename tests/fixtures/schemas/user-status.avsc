@@ -1,0 +1,6 @@
+{
+  "type": "enum",
+  "name": "UserStatus",
+  "namespace": "com.example.users",
+  "symbols": ["ACTIVE", "DISABLED"]
+}

@@ -1,0 +1,18 @@
+{
+  "type": "record",
+  "name": "UserStats",
+  "namespace": "com.example.users",
+  "fields": [
+    {
+      "name": "count",
+      "type": "long"
+    },
+    {
+      "name": "capturedAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    }
+  ]
+}

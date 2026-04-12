@@ -60,6 +60,8 @@ export interface KafkaTypegenSourcesConfig {
 }
 
 export interface KafkaTypegenGenerationConfig {
+  readonly avroExternalTypes?: Readonly<Record<string, string>>;
+  readonly avroSemanticMode?: 'default' | 'safe';
   readonly typesFileName?: string;
 }
 
@@ -174,6 +176,8 @@ export interface NormalizedSourcesConfig {
 }
 
 export interface NormalizedGenerationConfig {
+  readonly avroExternalTypes: Readonly<Record<string, string>>;
+  readonly avroSemanticMode: 'default' | 'safe';
   readonly typesFileName: string;
 }
 

@@ -23,12 +23,15 @@ export interface ParsedSchemaField {
   readonly type: string;
 }
 
+export type ParsedSchemaRootType = 'enum' | 'fixed' | 'record';
+
 export interface ParsedSchema {
   readonly avroType: Type;
   readonly fields: readonly ParsedSchemaField[];
   readonly filePath: string;
   readonly name: string;
   readonly namespace?: string;
+  readonly rootType: ParsedSchemaRootType;
   readonly rawSchema: Record<string, unknown>;
 }
 
@@ -50,7 +53,14 @@ export interface EventSchemaInput {
   readonly topicName: string;
 }
 
+export interface EventSchemaLoadOptions {
+  readonly externalTypeMappings?: Readonly<Record<string, string>>;
+}
+
 export interface EventSchemaLoader {
   loadEventSchema(input: EventSchemaInput): Promise<EventSchemaDefinition>;
-  loadEventSchemas(events: readonly EventSchemaInput[] | readonly NormalizedEventConfig[]): Promise<readonly EventSchemaDefinition[]>;
+  loadEventSchemas(
+    events: readonly EventSchemaInput[] | readonly NormalizedEventConfig[],
+    options?: EventSchemaLoadOptions
+  ): Promise<readonly EventSchemaDefinition[]>;
 }

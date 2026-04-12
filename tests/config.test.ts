@@ -30,6 +30,31 @@ describe('config validation', () => {
     expect(validateConfig(config)).toEqual(config);
   });
 
+  it('accepts Avro external type mappings and semantic rendering mode', () => {
+    const config = defineConfig({
+      generation: {
+        avroExternalTypes: {
+          'com.external.ExternalAddress': "import('./external-types.js').ExternalAddress"
+        },
+        avroSemanticMode: 'safe'
+      },
+      outputDir: './generated',
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './schemas/user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    } satisfies KafkaTypegenConfig);
+
+    expect(validateConfig(config)).toEqual(config);
+  });
+
   it('accepts a valid multi-event topic config', () => {
     const config = defineConfig({
       outputDir: './generated',
@@ -326,6 +351,31 @@ describe('config validation', () => {
     ).toThrowError(ConfigValidationError);
   });
 
+  it('rejects Avro external type mappings that reuse the same TypeScript type expression', () => {
+    expect(() =>
+      validateConfig({
+        generation: {
+          avroExternalTypes: {
+            'com.external.Address': "import('./types.js').SharedAddress",
+            'com.external.BillingAddress': "import('./types.js').SharedAddress"
+          }
+        },
+        outputDir: './generated',
+        topics: [
+          {
+            events: [
+              {
+                name: 'user.created',
+                schemaPath: './schemas/user-created.avsc'
+              }
+            ],
+            name: 'user.events'
+          }
+        ]
+      })
+    ).toThrowError(ConfigValidationError);
+  });
+
   it('requires topic sync config for every topic when kafka sync is enabled', () => {
     expect(() =>
       validateConfig({
@@ -538,6 +588,8 @@ describe('config normalization', () => {
     expect(normalized.sources.rootDir).toBe(resolvePath('./fixtures'));
     expect(normalized.resolvedOutputDir).toBe(resolvePath('./generated'));
     expect(normalized.generation).toEqual({
+      avroExternalTypes: {},
+      avroSemanticMode: 'default',
       typesFileName: 'types.ts'
     });
     expect(normalized.naming).toEqual({
@@ -628,6 +680,39 @@ describe('config normalization', () => {
     expect(overriddenPlatformaticConfig.runtime).toEqual({
       module: './runtime/custom-platformatic',
       transport: '@platformatic/kafka'
+    });
+  });
+
+  it('normalizes Avro generation defaults and sorts external type mappings', () => {
+    const normalized = resolveConfig({
+      generation: {
+        avroExternalTypes: {
+          'com.zeta.Address': "import('./types.js').ZetaAddress",
+          'com.alpha.Address': "import('./types.js').AlphaAddress"
+        },
+        avroSemanticMode: 'safe'
+      },
+      outputDir: './generated',
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './schemas/user-created.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+
+    expect(normalized.generation).toEqual({
+      avroExternalTypes: {
+        'com.alpha.Address': "import('./types.js').AlphaAddress",
+        'com.zeta.Address': "import('./types.js').ZetaAddress"
+      },
+      avroSemanticMode: 'safe',
+      typesFileName: 'kafka-client.ts'
     });
   });
 

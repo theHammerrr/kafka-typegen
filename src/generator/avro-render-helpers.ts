@@ -1,6 +1,7 @@
 export interface AvroTypeRenderContext {
   readonly path: string;
   readonly references?: Readonly<Record<string, string>>;
+  readonly semanticMode?: 'default' | 'safe';
 }
 
 export function createChildRenderContext(
@@ -8,8 +9,19 @@ export function createChildRenderContext(
   path: string
 ): AvroTypeRenderContext {
   return parentContext.references === undefined
-    ? { path }
-    : { path, references: parentContext.references };
+    ? {
+        path,
+        ...(parentContext.semanticMode !== undefined
+          ? { semanticMode: parentContext.semanticMode }
+          : {})
+      }
+    : {
+        path,
+        references: parentContext.references,
+        ...(parentContext.semanticMode !== undefined
+          ? { semanticMode: parentContext.semanticMode }
+          : {})
+      };
 }
 
 export function shouldRenderNamedReference(
@@ -79,8 +91,9 @@ export function renderPrimitiveType(
     case 'double':
     case 'float':
     case 'int':
-    case 'long':
       return 'number';
+    case 'long':
+      return context.semanticMode === 'safe' ? 'bigint' : 'number';
     case 'null':
       return 'null';
     case 'string':

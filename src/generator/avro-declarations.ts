@@ -15,11 +15,18 @@ function collectType(
   avroType: unknown,
   path: string,
   references: Map<string, string>,
-  declarationsByName: Map<string, string>
+  declarationsByName: Map<string, string>,
+  semanticMode: 'default' | 'safe'
 ): void {
   if (Array.isArray(avroType)) {
     avroType.forEach((memberType, index) =>
-      collectType(memberType, `${path}[${index}]`, references, declarationsByName)
+      collectType(
+        memberType,
+        `${path}[${index}]`,
+        references,
+        declarationsByName,
+        semanticMode
+      )
     );
     return;
   }
@@ -32,19 +39,44 @@ function collectType(
   registerNamedTypeReferences(typeRecord, references);
 
   if (Array.isArray(typeRecord.fields)) {
-    collectNamedRecord(typeRecord, path, references, declarationsByName);
+    collectNamedRecord(
+      typeRecord,
+      path,
+      references,
+      declarationsByName,
+      semanticMode
+    );
   }
   emitEnumOrFixedDeclaration(typeRecord, declarationsByName);
-  collectType(typeRecord.type, `${path}.type`, references, declarationsByName);
-  collectType(typeRecord.items, `${path}.items`, references, declarationsByName);
-  collectType(typeRecord.values, `${path}.values`, references, declarationsByName);
+  collectType(
+    typeRecord.type,
+    `${path}.type`,
+    references,
+    declarationsByName,
+    semanticMode
+  );
+  collectType(
+    typeRecord.items,
+    `${path}.items`,
+    references,
+    declarationsByName,
+    semanticMode
+  );
+  collectType(
+    typeRecord.values,
+    `${path}.values`,
+    references,
+    declarationsByName,
+    semanticMode
+  );
 }
 
 function collectNamedRecord(
   typeRecord: Record<string, unknown>,
   path: string,
   references: Map<string, string>,
-  declarationsByName: Map<string, string>
+  declarationsByName: Map<string, string>,
+  semanticMode: 'default' | 'safe'
 ): void {
   if (typeof typeRecord.name !== 'string' || !Array.isArray(typeRecord.fields)) {
     return;
@@ -59,11 +91,13 @@ function collectNamedRecord(
         fieldRecord.type,
         `${path}.fields[${index}].type`,
         references,
-        declarationsByName
+        declarationsByName,
+        semanticMode
       );
       return `${fieldName}: ${toTypeScriptType(fieldRecord.type, {
         path: `${path}.fields[${index}].type`,
-        references: Object.fromEntries(references)
+        references: Object.fromEntries(references),
+        semanticMode
       })};`;
     })
     .join('\n');
@@ -77,7 +111,8 @@ function collectNamedRecord(
 export function collectAvroDeclarations(
   rootSchema: Record<string, unknown>,
   rootTypeName: string,
-  sharedReferences: Readonly<Record<string, string>> = {}
+  sharedReferences: Readonly<Record<string, string>> = {},
+  semanticMode: 'default' | 'safe' = 'default'
 ): AvroDeclarationOutput {
   const references = new Map<string, string>(
     Object.entries(sharedReferences)
@@ -90,6 +125,7 @@ export function collectAvroDeclarations(
     references.set(referenceName, targetName);
   }
   const declarationsByName = new Map<string, string>();
+  emitEnumOrFixedDeclaration(rootSchema, declarationsByName);
 
   const rootFields = Array.isArray(rootSchema.fields) ? rootSchema.fields : [];
   rootFields.forEach((field, index) => {
@@ -98,7 +134,8 @@ export function collectAvroDeclarations(
       fieldRecord.type,
       `${String(rootSchema.name)}.fields[${index}].type`,
       references,
-      declarationsByName
+      declarationsByName,
+      semanticMode
     );
   });
 
