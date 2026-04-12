@@ -76,6 +76,7 @@ describe('public entrypoint', () => {
 
   it('ships runtime subpath exports for generic and platformatic runtimes', async () => {
     const runtimeModule = await import('../src/runtime/index.js');
+    const advancedRuntimeModule = await import('../src/runtime/advanced.js');
     const platformaticRuntimeModule = await import('../src/runtime/platformatic.js');
     const packageJson = JSON.parse(await readFile('package.json', 'utf8')) as {
       exports: Record<string, unknown>;
@@ -88,14 +89,19 @@ describe('public entrypoint', () => {
     expect(runtimeModule.createPlatformaticRuntimeClient).toBeTypeOf('function');
     expect(runtimeModule.createPlatformaticRuntimeProducer).toBeTypeOf('function');
     expect(runtimeModule.createPlatformaticRuntimeConsumer).toBeTypeOf('function');
-    expect(runtimeModule.createPlatformaticProducerTransport).toBeTypeOf('function');
-    expect(runtimeModule.createPlatformaticConsumerTransport).toBeTypeOf('function');
     expect(platformaticRuntimeModule.createPlatformaticRuntimeClient).toBeTypeOf('function');
     expect(platformaticRuntimeModule.createPlatformaticRuntimeProducer).toBeTypeOf('function');
     expect(platformaticRuntimeModule.createPlatformaticRuntimeConsumer).toBeTypeOf('function');
-    expect(platformaticRuntimeModule.createPlatformaticProducerTransport).toBeTypeOf('function');
-    expect(platformaticRuntimeModule.createPlatformaticConsumerTransport).toBeTypeOf('function');
+    expect(advancedRuntimeModule.createPlatformaticProducerTransport).toBeTypeOf('function');
+    expect(advancedRuntimeModule.createPlatformaticConsumerTransport).toBeTypeOf('function');
+    expect(advancedRuntimeModule.createSchemaRegistrySerialization).toBeTypeOf('function');
+    expect('createPlatformaticProducerTransport' in runtimeModule).toBe(false);
+    expect('createPlatformaticConsumerTransport' in runtimeModule).toBe(false);
+    expect('createSchemaRegistrySerialization' in runtimeModule).toBe(false);
+    expect('createPlatformaticProducerTransport' in platformaticRuntimeModule).toBe(false);
+    expect('createPlatformaticConsumerTransport' in platformaticRuntimeModule).toBe(false);
     expect(packageJson.exports['./runtime']).toBeDefined();
+    expect(packageJson.exports['./runtime/advanced']).toBeDefined();
     expect(packageJson.exports['./runtime/platformatic']).toBeDefined();
   });
 });

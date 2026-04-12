@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- Added `kafka-typegen/runtime/advanced` for low-level runtime transport adapters and transport-facing
+  types.
+
+### Changed
+
+- Trimmed `kafka-typegen/runtime` and `kafka-typegen/runtime/platformatic` to the stable high-level
+  runtime API. Import transport adapter internals from `kafka-typegen/runtime/advanced`.
+
 ## 0.2.0 - 2026-04-03
 
 ### Added
