@@ -2,6 +2,12 @@ import type { EventCatalog } from '../catalog/index.js';
 import type { NormalizedKafkaTypegenConfig } from '../config/index.js';
 
 import { buildSchemaRegistryPlan } from './schema-registry-plan.js';
+import {
+  buildSchemaEvolutionDetails,
+  buildSchemaEvolutionFailure
+} from './schema-registry-evolution.js';
+import { assertSchemaRegistryDriftAllowed } from './schema-registry-sync-errors.js';
+import { buildRegistryDriftDetails } from './schema-registry-sync-details.js';
 import { normalizeSchemaText } from './schema-registry-schema-text.js';
 import {
   applySubjectCompatibility,
@@ -51,9 +57,22 @@ export async function executeSchemaRegistrySync(
     }
 
     if (schemaRegistryConfig?.onDrift === 'register') {
+      const evolutionHints = buildSchemaEvolutionDetails(
+        existing.schemaText,
+        subject.schemaText
+      );
       if (apply) {
         await applySubjectCompatibility(schemaRegistry, config, subject.subjectName);
-        await registerSubjectVersion(schemaRegistry, subject);
+
+        try {
+          await registerSubjectVersion(schemaRegistry, subject);
+        } catch (error) {
+          throw buildSchemaEvolutionFailure(
+            error,
+            existing.schemaText,
+            subject.schemaText
+          );
+        }
       }
 
       operations.push({
@@ -62,7 +81,8 @@ export async function executeSchemaRegistrySync(
           apply
             ? `Registered a new schema version for event '${subject.eventName}'.`
             : `A new schema version will be registered for event '${subject.eventName}'.`,
-          ...buildCompatibilityDetails(config, apply)
+          ...buildCompatibilityDetails(config, apply),
+          ...evolutionHints
         ].join(' '),
         resourceName: subject.subjectName,
         target: 'registry'
@@ -72,23 +92,18 @@ export async function executeSchemaRegistrySync(
 
     operations.push({
       action: 'drift',
-      details:
+      details: buildRegistryDriftDetails(
+        subject.eventName,
+        existing.schemaText,
+        subject.schemaText,
         schemaRegistryConfig?.onDrift === 'ignore'
-          ? `Existing subject schema differs for event '${subject.eventName}' and will be left unchanged.`
-          : `Existing subject schema differs for event '${subject.eventName}'.`,
+      ),
       resourceName: subject.subjectName,
       target: 'registry'
     });
   }
 
-  if (
-    schemaRegistryConfig?.onDrift === 'fail' &&
-    operations.some((operation) => operation.action === 'drift')
-  ) {
-    throw new Error(
-      'Schema Registry sync detected subject drift and sync.schemaRegistry.onDrift is set to fail.'
-    );
-  }
+  assertSchemaRegistryDriftAllowed(operations, schemaRegistryConfig?.onDrift === 'fail');
 
   return operations;
 }

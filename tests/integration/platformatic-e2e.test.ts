@@ -218,6 +218,10 @@ describe('testcontainers integration', () => {
       `Failed to register Schema Registry subject '${runId}.user.events-user.created' for event 'user.created'`
     );
     expect(evolutionApplyResult.stderr).toContain('Schema Registry request failed');
+    expect(evolutionApplyResult.stderr).toContain('Evolution hints:');
+    expect(evolutionApplyResult.stderr).toContain(
+      "Field 'displayName' was added without a default."
+    );
   });
 });
 
