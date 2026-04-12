@@ -9,6 +9,7 @@ import type {
   SendOptions
 } from '@platformatic/kafka';
 
+import type { KafkaTypegenObservabilityOptions } from '../observability.js';
 import type { RuntimeSerializationOptions } from './types.js';
 
 export type PlatformaticProducerLike<TKey = Buffer> = Pick<
@@ -51,4 +52,4 @@ export type PlatformaticRuntimeClientOptions<
   RuntimeSerializationOptions & {
   readonly consumer: TConsumer;
   readonly producer: TProducer;
-};
+} & KafkaTypegenObservabilityOptions;

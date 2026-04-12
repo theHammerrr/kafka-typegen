@@ -412,6 +412,27 @@ export default defineConfig({
 
 The generated client is transport-agnostic. It talks to a runtime interface, and this package ships generic, KafkaJS, and Platformatic runtime entrypoints.
 
+### Observability
+
+Runtime and sync entrypoints accept optional observability hooks:
+
+```ts
+type KafkaTypegenLogger = {
+  debug(message: string, context?: Record<string, unknown>): void;
+  info(message: string, context?: Record<string, unknown>): void;
+  warn(message: string, context?: Record<string, unknown>): void;
+  error(message: string, context?: Record<string, unknown>): void;
+};
+
+type KafkaTypegenObserver = {
+  onEvent(event: KafkaTypegenObservedEvent): void | Promise<void>;
+};
+```
+
+- `logger` is used for diagnostics and internal failures. If omitted, `kafka-typegen` falls back to `console`.
+- `observer` receives structured runtime and sync events such as send/handle start-success-failure and sync start-complete-failure.
+- These hooks are additive. Operations still throw or fail through their normal control-flow APIs.
+
 ### Generic runtime
 
 Import from `kafka-typegen/runtime` for the generic runtime constructors, and from `kafka-typegen/runtime/advanced` for the low-level transport interfaces when you want to provide your own transport adapters:

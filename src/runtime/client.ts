@@ -1,3 +1,4 @@
+import { resolveObservability } from '../observability.js';
 import { DefaultRuntimeConsumer } from './consumer-runtime.js';
 import { DefaultRuntimeProducer } from './producer-runtime.js';
 import { resolveRuntimeSerialization } from './runtime-serialization.js';
@@ -9,13 +10,15 @@ export function createRuntimeClient<
 >(
   options: RuntimeClientOptions<TSendOptions, TSubscriptionOptions>
 ): RuntimeClient<TSendOptions, TSubscriptionOptions> {
+  const observability = resolveObservability(options);
   const resolvedOptions: ResolvedRuntimeClientOptions<
     TSendOptions,
     TSubscriptionOptions
   > = {
     consumerTransport: options.consumerTransport,
+    observability,
     producerTransport: options.producerTransport,
-    serialization: resolveRuntimeSerialization(options)
+    serialization: resolveRuntimeSerialization(options, observability)
   };
 
   return {
