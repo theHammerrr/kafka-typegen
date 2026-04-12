@@ -13,12 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added generation support for nested named Avro `record`, `enum`, and `fixed` declarations.
 - Added generation support for Avro logical types `date`, `time-millis`, `timestamp-millis`,
   `timestamp-micros`, and `decimal`.
+- Added a Docker-backed Testcontainers integration suite for real Kafka, Schema Registry, generated-app
+  typechecking, runtime happy paths, and consumer error propagation.
 
 ### Changed
 
 - Unsupported Avro schema constructs now fail generation with explicit path-aware errors instead of
   silently emitting `unknown`.
 - Generated imports are documented as direct relative imports from generated source files.
+- Schema Registry sync drift detection now compares canonicalized Avro schema definitions instead of raw
+  JSON text.
 
 ### Removed
 
