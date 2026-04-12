@@ -1,0 +1,49 @@
+// Runtime negative test: throws inside a typed event handler and verifies the
+// consumer-level `onError` callback receives the handler failure.
+import { Consumer, Producer } from '@platformatic/kafka';
+import { createPlatformaticRuntimeClient } from 'kafka-typegen/runtime';
+import { SchemaRegistryConfig, createClient } from './generated/kafka/index.js';
+
+const producer = new Producer({
+  bootstrapBrokers: ['{{KAFKA_BROKER}}'],
+  clientId: '{{RUN_ID}}-handler-error-producer'
+});
+let resolveError: ((message: string) => void) | undefined;
+const handlerError = new Promise<string>((resolve, reject) => {
+  resolveError = resolve;
+  setTimeout(() => reject(new Error('Timed out waiting for handler error.')), 60_000).unref();
+});
+const client = createClient(createPlatformaticRuntimeClient({
+  consumer: new Consumer({
+    bootstrapBrokers: ['{{KAFKA_BROKER}}'],
+    clientId: '{{RUN_ID}}-handler-error-consumer',
+    groupId: '{{RUN_ID}}-handler-error-consumer-group'
+  }),
+  onError(error) {
+    resolveError?.(error instanceof Error ? error.message : String(error));
+  },
+  producer,
+  schemaRegistry: SchemaRegistryConfig
+}));
+
+await client.consumer.events.userCreated.on(async () => {
+  // Intentional handler failure: this should be routed to `onError`, not swallowed.
+  throw new Error('handler failed');
+}, {
+  autocommit: true,
+  mode: 'latest'
+});
+await client.producer.events.userCreated.send({
+  email: 'ada@example.com',
+  id: 'user-1',
+  isAdmin: true
+});
+
+const errorMessage = await handlerError;
+if (errorMessage !== 'handler failed') {
+  throw new Error(`Unexpected handler error message: ${errorMessage}`);
+}
+
+console.log('HANDLER_ERROR:' + errorMessage);
+await client.producer.close();
+await client.consumer.close(true);

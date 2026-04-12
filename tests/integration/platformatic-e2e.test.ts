@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
@@ -12,8 +14,13 @@ import {
   runTypecheck,
   runWorkspaceScript
 } from './workspace.js';
+import {
+  type IntegrationAppFixtureName,
+  renderIntegrationAppFixture
+} from './app-fixtures.js';
 
 let environment: IntegrationEnvironment;
+let runSequence = 0;
 const workspaces: string[] = [];
 
 beforeAll(async () => {
@@ -30,14 +37,15 @@ afterAll(async () => {
 
 describe('testcontainers integration', () => {
   it('runs sync dry-run, sync --apply, and verifies no drift after apply', async () => {
-    const workspace = await createWorkspace(createConfigText());
+    const runId = createRunId();
+    const workspace = await createWorkspace(createConfigText({ runId }), { runId });
 
     const dryRunResult = await runCliCommand(workspace, ['sync']);
     expect(dryRunResult.exitCode).toBe(0);
-    expect(dryRunResult.stdout).toContain('[kafka] CREATE user.profile');
-    expect(dryRunResult.stdout).toContain('[kafka] CREATE user.events');
-    expect(dryRunResult.stdout).toContain('[registry] CREATE user.profile-user.profiled');
-    expect(dryRunResult.stdout).toContain('[registry] CREATE user.events-user.created');
+    expect(dryRunResult.stdout).toContain(`[kafka] CREATE ${runId}.user.profile`);
+    expect(dryRunResult.stdout).toContain(`[kafka] CREATE ${runId}.user.events`);
+    expect(dryRunResult.stdout).toContain(`[registry] CREATE ${runId}.user.profile-user.profiled`);
+    expect(dryRunResult.stdout).toContain(`[registry] CREATE ${runId}.user.events-user.created`);
 
     const applyResult = await runCliCommand(workspace, ['sync', '--apply']);
     expect(applyResult.exitCode).toBe(0);
@@ -50,6 +58,7 @@ describe('testcontainers integration', () => {
       operations: Array<{ action: string }>;
     };
     expect(noDriftSync.applied).toBe(false);
+    expect(noDriftSync.operations).toHaveLength(5);
     if (!noDriftSync.operations.every((operation) => operation.action === 'noop')) {
       throw new Error(
         `Expected all post-apply sync operations to be noops.\n${JSON.stringify(noDriftSync.operations, null, 2)}`
@@ -58,7 +67,7 @@ describe('testcontainers integration', () => {
   });
 
   it('compiles generated code and user code, then produces and consumes real Kafka messages', async () => {
-    const workspace = await createBuiltWorkspace(createHappyPathAppFiles());
+    const workspace = await createBuiltWorkspace(['happy-path.ts']);
 
     const result = await runWorkspaceScript(workspace, 'happy-path.js');
 
@@ -67,9 +76,7 @@ describe('testcontainers integration', () => {
   });
 
   it('surfaces producer serialization failures for invalid payloads', async () => {
-    const workspace = await createBuiltWorkspace({
-      'invalid-produce.ts': createInvalidProduceSource()
-    });
+    const workspace = await createBuiltWorkspace(['invalid-produce.ts']);
 
     const result = await runWorkspaceScript(workspace, 'invalid-produce.js');
 
@@ -78,9 +85,7 @@ describe('testcontainers integration', () => {
   });
 
   it('surfaces schema-registry decode failures through the consumer onError hook', async () => {
-    const workspace = await createBuiltWorkspace({
-      'decode-error.ts': createDecodeErrorSource()
-    });
+    const workspace = await createBuiltWorkspace(['decode-error.ts']);
 
     const result = await runWorkspaceScript(workspace, 'decode-error.js');
 
@@ -89,9 +94,7 @@ describe('testcontainers integration', () => {
   });
 
   it('surfaces async handler failures through onError', async () => {
-    const workspace = await createBuiltWorkspace({
-      'handler-error.ts': createHandlerErrorSource()
-    });
+    const workspace = await createBuiltWorkspace(['handler-error.ts']);
 
     const result = await runWorkspaceScript(workspace, 'handler-error.js');
 
@@ -100,30 +103,53 @@ describe('testcontainers integration', () => {
   });
 
   it('fails deterministically for conflicting repeated topic subscriptions', async () => {
-    const workspace = await createBuiltWorkspace({
-      'conflicting-options.ts': createConflictingOptionsSource()
-    });
+    const workspace = await createBuiltWorkspace(['conflicting-options.ts']);
 
     const result = await runWorkspaceScript(workspace, 'conflicting-options.js');
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("CONFLICT:Topic 'user.events' is already subscribed with different consume options.");
+    expect(result.stdout).toContain('CONFLICT:Topic ');
+    expect(result.stdout).toContain(
+      "user.events' is already subscribed with different consume options."
+    );
   });
 
   it('fails sync when Kafka topic drift or Schema Registry subject drift is detected', async () => {
+    const kafkaRunId = createRunId();
+    const kafkaBaselineWorkspace = await createWorkspace(
+      createConfigText({ runId: kafkaRunId }),
+      { runId: kafkaRunId }
+    );
+    const kafkaBaselineApply = await runCliCommand(kafkaBaselineWorkspace, [
+      'sync',
+      '--apply'
+    ]);
+    expect(kafkaBaselineApply.exitCode).toBe(0);
     const driftedKafkaWorkspace = await createWorkspace(createConfigText({
       kafkaPartitions: 2,
-      kafkaDriftChecks: true
-    }));
+      kafkaDriftChecks: true,
+      runId: kafkaRunId
+    }), { runId: kafkaRunId });
     const kafkaDriftResult = await runCliCommand(driftedKafkaWorkspace, ['sync']);
 
     expect(kafkaDriftResult.exitCode).toBe(1);
     expect(kafkaDriftResult.stderr).toContain('Kafka sync detected topic drift');
 
+    const registryRunId = createRunId();
+    const registryBaselineWorkspace = await createWorkspace(
+      createConfigText({ runId: registryRunId }),
+      { runId: registryRunId }
+    );
+    const registryBaselineApply = await runCliCommand(registryBaselineWorkspace, [
+      'sync',
+      '--apply'
+    ]);
+    expect(registryBaselineApply.exitCode).toBe(0);
     const driftedRegistryWorkspace = await createWorkspace(createConfigText({
       profileSchemaPath: './user-created.avsc',
-      registryDriftChecks: true
-    }));
+      registryDriftChecks: true,
+      runId: registryRunId
+    }), { runId: registryRunId });
     const registryDriftResult = await runCliCommand(driftedRegistryWorkspace, ['sync']);
 
     expect(registryDriftResult.exitCode).toBe(1);
@@ -131,16 +157,19 @@ describe('testcontainers integration', () => {
   });
 
   it('registers a new schema version on compatible subject drift during apply', async () => {
-    const workspace = await createWorkspace(createConfigText());
+    const runId = createRunId();
+    const workspace = await createWorkspace(createConfigText({ runId }), { runId });
     const firstApplyResult = await runCliCommand(workspace, ['sync', '--apply']);
     expect(firstApplyResult.exitCode).toBe(0);
 
     const evolvedWorkspace = await createSchemaEvolutionWorkspace(
       createEvolutionConfigText({
         compatibility: 'BACKWARD',
-        onDrift: 'register'
+        onDrift: 'register',
+        runId
       }),
-      createCompatibleUserCreatedSchema()
+      createCompatibleUserCreatedSchema(),
+      runId
     );
     const driftDryRunResult = await runCliCommand(evolvedWorkspace, ['sync', '--json']);
     expect(driftDryRunResult.exitCode).toBe(0);
@@ -154,7 +183,7 @@ describe('testcontainers integration', () => {
 
     const evolutionApplyResult = await runCliCommand(evolvedWorkspace, ['sync', '--apply']);
     expect(evolutionApplyResult.exitCode).toBe(0);
-    expect(evolutionApplyResult.stdout).toContain('[registry] UPDATE user.events-user.created');
+    expect(evolutionApplyResult.stdout).toContain(`[registry] UPDATE ${runId}.user.events-user.created`);
     expect(evolutionApplyResult.stdout).toContain('Compatibility BACKWARD was applied.');
 
     const noDriftResult = await runCliCommand(evolvedWorkspace, ['sync', '--json']);
@@ -168,22 +197,25 @@ describe('testcontainers integration', () => {
   });
 
   it('surfaces Schema Registry compatibility failures on incompatible evolution', async () => {
-    const workspace = await createWorkspace(createConfigText());
+    const runId = createRunId();
+    const workspace = await createWorkspace(createConfigText({ runId }), { runId });
     const firstApplyResult = await runCliCommand(workspace, ['sync', '--apply']);
     expect(firstApplyResult.exitCode).toBe(0);
 
     const evolvedWorkspace = await createSchemaEvolutionWorkspace(
       createEvolutionConfigText({
         compatibility: 'FULL',
-        onDrift: 'register'
+        onDrift: 'register',
+        runId
       }),
-      createIncompatibleUserCreatedSchema()
+      createIncompatibleUserCreatedSchema(),
+      runId
     );
     const evolutionApplyResult = await runCliCommand(evolvedWorkspace, ['sync', '--apply']);
 
     expect(evolutionApplyResult.exitCode).toBe(1);
     expect(evolutionApplyResult.stderr).toContain(
-      "Failed to register Schema Registry subject 'user.events-user.created' for event 'user.created'"
+      `Failed to register Schema Registry subject '${runId}.user.events-user.created' for event 'user.created'`
     );
     expect(evolutionApplyResult.stderr).toContain('Schema Registry request failed');
   });
@@ -191,10 +223,21 @@ describe('testcontainers integration', () => {
 
 async function createWorkspace(
   configContents: string,
-  appFiles: Readonly<Record<string, string>> = {}
+  options: {
+    readonly appFixtures?: readonly IntegrationAppFixtureName[];
+    readonly appFiles?: Readonly<Record<string, string>>;
+    readonly runId: string;
+  }
 ): Promise<string> {
+  const appFiles = {
+    'typecheck-app.ts': await renderIntegrationAppFixture('typecheck-app.ts', {
+      kafkaBroker: environment.kafkaBroker,
+      runId: options.runId
+    }),
+    ...(await renderAppFixtureFiles(options.appFixtures ?? [], options.runId)),
+    ...(options.appFiles ?? {})
+  };
   const workspace = await createIntegrationWorkspace(configContents, {
-    'typecheck-app.ts': createTypecheckSource(),
     ...appFiles
   });
   workspaces.push(workspace);
@@ -206,9 +249,13 @@ async function createWorkspace(
 }
 
 async function createBuiltWorkspace(
-  appFiles: Readonly<Record<string, string>>
+  appFixtures: readonly IntegrationAppFixtureName[]
 ): Promise<string> {
-  const workspace = await createWorkspace(createConfigText(), appFiles);
+  const runId = createRunId();
+  const workspace = await createWorkspace(createConfigText({ runId }), {
+    appFixtures,
+    runId
+  });
   const applyResult = await runCliCommand(workspace, ['sync', '--apply']);
   expect(applyResult.exitCode).toBe(0);
 
@@ -231,10 +278,14 @@ async function createBuiltWorkspace(
 
 async function createSchemaEvolutionWorkspace(
   configContents: string,
-  userCreatedSchemaContents: string
+  userCreatedSchemaContents: string,
+  runId: string
 ): Promise<string> {
   const workspace = await createIntegrationWorkspace(configContents, {
-    'typecheck-app.ts': createTypecheckSource(),
+    'typecheck-app.ts': await renderIntegrationAppFixture('typecheck-app.ts', {
+      kafkaBroker: environment.kafkaBroker,
+      runId
+    }),
     '../schemas/user-created.avsc': userCreatedSchemaContents
   });
   workspaces.push(workspace);
@@ -254,7 +305,10 @@ function createConfigText(options: {
   kafkaPartitions?: number;
   profileSchemaPath?: string;
   registryDriftChecks?: boolean;
+  runId?: string;
 } = {}): string {
+  const runId = options.runId ?? createRunId();
+
   return `export default {
   outputDir: './src/generated/kafka',
   runtime: {
@@ -266,7 +320,7 @@ function createConfigText(options: {
   sync: {
     kafka: {
       brokers: ['${environment.kafkaBroker}'],
-      clientId: 'kafka-typegen-integration-sync',
+      clientId: '${runId}-kafka-typegen-integration-sync',
       failOnDrift: ${options.kafkaDriftChecks === true}
     },
     schemaRegistry: {
@@ -278,7 +332,7 @@ function createConfigText(options: {
   },
   topics: [
     {
-      name: 'user.profile',
+      name: '${runId}.user.profile',
       sync: {
         partitions: ${options.kafkaPartitions ?? 1},
         replicationFactor: 1
@@ -291,7 +345,7 @@ function createConfigText(options: {
       ]
     },
     {
-      name: 'user.events',
+      name: '${runId}.user.events',
       sync: {
         partitions: 1,
         replicationFactor: 1
@@ -315,6 +369,7 @@ function createConfigText(options: {
 function createEvolutionConfigText(options: {
   compatibility: 'BACKWARD' | 'FULL';
   onDrift: 'register';
+  runId: string;
 }): string {
   return `export default {
   outputDir: './src/generated/kafka',
@@ -335,7 +390,7 @@ function createEvolutionConfigText(options: {
   },
   topics: [
     {
-      name: 'user.events',
+      name: '${options.runId}.user.events',
       events: [
         {
           name: 'user.created',
@@ -345,381 +400,6 @@ function createEvolutionConfigText(options: {
     }
   ]
 };
-`;
-}
-
-function createTypecheckSource(): string {
-  return `import { Consumer, Producer } from '@platformatic/kafka';
-import {
-  createPlatformaticRuntimeClient,
-  createPlatformaticRuntimeConsumer,
-  createPlatformaticRuntimeProducer
-} from 'kafka-typegen/runtime';
-import {
-  EventNames,
-  SchemaRegistryConfig,
-  TopicNames,
-  createClient,
-  createConsumer,
-  createProducer,
-  type UserCreatedPayload,
-  type UserProfiledPayload
-} from './generated/kafka/index.js';
-
-const producerClient = new Producer({
-  bootstrapBrokers: ['${environment.kafkaBroker}'],
-  clientId: 'typecheck-producer'
-});
-const consumerClient = new Consumer({
-  bootstrapBrokers: ['${environment.kafkaBroker}'],
-  clientId: 'typecheck-consumer',
-  groupId: 'typecheck-consumer-group'
-});
-
-const client = createClient(createPlatformaticRuntimeClient({
-  producer: producerClient,
-  consumer: consumerClient,
-  schemaRegistry: SchemaRegistryConfig
-}));
-const producer = createProducer(createPlatformaticRuntimeProducer({
-  producer: producerClient,
-  schemaRegistry: SchemaRegistryConfig
-}));
-const consumer = createConsumer(createPlatformaticRuntimeConsumer({
-  consumer: consumerClient,
-  schemaRegistry: SchemaRegistryConfig
-}));
-
-const userCreated: UserCreatedPayload = {
-  email: 'ada@example.com',
-  id: 'user-1',
-  isAdmin: true
-};
-const userProfiled: UserProfiledPayload = {
-  balance: null,
-  birthDate: 19800,
-  id: '550e8400-e29b-41d4-a716-446655440000',
-  primaryAddress: {
-    createdAt: Date.now(),
-    street: 'Main Street'
-  },
-  shippingAddress: {
-    createdAt: Date.now(),
-    street: 'Second Street'
-  },
-  status: 'ACTIVE'
-};
-
-void producer.events.userCreated.send(userCreated, { acks: -1 });
-void client.producer.send(EventNames.UserProfiled, userProfiled);
-void consumer.events.userCreated.on(async (message) => {
-  message.payload.isAdmin;
-}, { mode: 'latest', autocommit: true });
-void consumer.onTopic(TopicNames.UserEvents, async (message) => {
-  message.topic;
-}, { mode: 'latest', autocommit: false });
-void consumer.close(true);
-void producer.close();
-`;
-}
-
-function createHappyPathAppFiles(): Record<string, string> {
-  return {
-    'happy-path.ts': `import { Consumer, Producer } from '@platformatic/kafka';
-import { createPlatformaticRuntimeClient } from 'kafka-typegen/runtime';
-import {
-  SchemaRegistryConfig,
-  TopicNames,
-  createClient
-} from './generated/kafka/index.js';
-
-const producerClient = new Producer({
-  bootstrapBrokers: ['${environment.kafkaBroker}'],
-  clientId: 'happy-path-producer'
-});
-const consumerClient = new Consumer({
-  bootstrapBrokers: ['${environment.kafkaBroker}'],
-  clientId: 'happy-path-consumer',
-  groupId: 'happy-path-consumer-group'
-});
-const client = createClient(createPlatformaticRuntimeClient({
-  producer: producerClient,
-  consumer: consumerClient,
-  schemaRegistry: SchemaRegistryConfig
-}));
-
-const receivedEvents: string[] = [];
-let nextUserEventsOffset = 0n;
-let userEventsPartition = 0;
-let resolveAllMessages: (() => void) | undefined;
-const allMessages = new Promise<void>((resolve, reject) => {
-  resolveAllMessages = resolve;
-  setTimeout(() => reject(new Error('Timed out waiting for consumed messages.')), 60_000).unref();
-});
-
-await client.consumer.events.userProfiled.on(async (message) => {
-  receivedEvents.push(message.event);
-  maybeResolve();
-}, { autocommit: true, mode: 'latest' });
-await client.consumer.events.userCreated.on(async (message) => {
-  receivedEvents.push(message.event);
-  userEventsPartition = message.partition ?? 0;
-  nextUserEventsOffset = BigInt(message.offset ?? '0') + 1n;
-  await client.consumer.commit({
-    offsets: [{
-      leaderEpoch: 0,
-      offset: nextUserEventsOffset,
-      partition: userEventsPartition,
-      topic: TopicNames.UserEvents
-    }]
-  });
-  maybeResolve();
-}, { autocommit: false, mode: 'latest' });
-await client.consumer.events.userUpdated.on(async (message) => {
-  receivedEvents.push(message.event);
-  userEventsPartition = message.partition ?? 0;
-  nextUserEventsOffset = BigInt(message.offset ?? '0') + 1n;
-  await client.consumer.commit({
-    offsets: [{
-      leaderEpoch: 0,
-      offset: nextUserEventsOffset,
-      partition: userEventsPartition,
-      topic: TopicNames.UserEvents
-    }]
-  });
-  maybeResolve();
-}, { autocommit: false, mode: 'latest' });
-
-await client.producer.events.userProfiled.send({
-  balance: null,
-  birthDate: 19800,
-  id: '550e8400-e29b-41d4-a716-446655440000',
-  primaryAddress: {
-    createdAt: 1_700_000_000_000,
-    street: 'Main Street'
-  },
-  shippingAddress: {
-    createdAt: 1_700_000_100_000,
-    street: 'Second Street'
-  },
-  status: 'ACTIVE'
-}, { acks: -1 });
-await client.producer.events.userCreated.send({
-  email: 'ada@example.com',
-  id: 'user-1',
-  isAdmin: true
-}, { acks: -1 });
-await client.producer.events.userUpdated.send({
-  displayName: 'Ada',
-  id: 'user-1',
-  metadata: {
-    role: 'admin'
-  }
-}, { acks: -1 });
-
-await allMessages;
-
-if ([...receivedEvents].sort().join(',') !== 'user.created,user.profiled,user.updated') {
-  throw new Error('Unexpected consumed events: ' + JSON.stringify(receivedEvents));
-}
-
-const committedOffsets = await client.consumer.listCommittedOffsets({
-  topics: [{
-    partitions: [userEventsPartition],
-    topic: TopicNames.UserEvents
-  }]
-});
-
-if ((committedOffsets.get(TopicNames.UserEvents)?.[userEventsPartition] ?? 0n) < nextUserEventsOffset) {
-  throw new Error('Expected manual commit to persist the user.events offset.');
-}
-
-await client.producer.close();
-await client.consumer.close(true);
-console.log('HAPPY_PATH_OK');
-
-function maybeResolve(): void {
-  if (receivedEvents.length === 3) {
-    resolveAllMessages?.();
-  }
-}
-`
-  };
-}
-
-function createInvalidProduceSource(): string {
-  return `import { Producer } from '@platformatic/kafka';
-import { createPlatformaticRuntimeProducer } from 'kafka-typegen/runtime';
-import {
-  SchemaRegistryConfig,
-  createProducer,
-  type UserCreatedPayload
-} from './generated/kafka/index.js';
-
-const producer = createProducer(createPlatformaticRuntimeProducer({
-  producer: new Producer({
-    bootstrapBrokers: ['${environment.kafkaBroker}'],
-    clientId: 'invalid-produce'
-  }),
-  schemaRegistry: SchemaRegistryConfig
-}));
-
-let rejectionMessage: string | undefined;
-
-try {
-  await producer.events.userCreated.send({
-    id: 'broken'
-  } as unknown as UserCreatedPayload);
-} catch (error) {
-  rejectionMessage = String(error);
-} finally {
-  await producer.close();
-}
-
-if (rejectionMessage === undefined) {
-  throw new Error('Expected invalid payload send to reject.');
-}
-
-console.log('SEND_REJECTED:' + rejectionMessage);
-`;
-}
-
-function createDecodeErrorSource(): string {
-  return `import { Buffer } from 'node:buffer';
-
-import { Consumer, Producer } from '@platformatic/kafka';
-import { createPlatformaticRuntimeConsumer } from 'kafka-typegen/runtime';
-import {
-  EventNames,
-  SchemaRegistryConfig,
-  TopicNames,
-  createConsumer
-} from './generated/kafka/index.js';
-
-const producer = new Producer({
-  bootstrapBrokers: ['${environment.kafkaBroker}'],
-  clientId: 'decode-error-producer'
-});
-let resolveError: ((message: string) => void) | undefined;
-const consumerError = new Promise<string>((resolve, reject) => {
-  resolveError = resolve;
-  setTimeout(() => reject(new Error('Timed out waiting for decode error.')), 60_000).unref();
-});
-const consumer = createConsumer(createPlatformaticRuntimeConsumer({
-  consumer: new Consumer({
-    bootstrapBrokers: ['${environment.kafkaBroker}'],
-    clientId: 'decode-error-consumer',
-    groupId: 'decode-error-consumer-group'
-  }),
-  onError(error) {
-    resolveError?.(String(error));
-  },
-  schemaRegistry: SchemaRegistryConfig
-}));
-
-await consumer.events.userCreated.on(async () => {}, {
-  autocommit: true,
-  mode: 'latest'
-});
-const invalidPayload = Buffer.alloc(5);
-invalidPayload[0] = 0;
-invalidPayload.writeUInt32BE(999_999, 1);
-await producer.send({
-  acks: -1,
-  messages: [{
-    headers: new Map([
-      [Buffer.from('x-kafka-typegen-event'), Buffer.from(EventNames.UserCreated)]
-    ]),
-    topic: TopicNames.UserEvents,
-    value: invalidPayload
-  }]
-});
-
-console.log('CONSUMER_ERROR:' + await consumerError);
-await producer.close();
-await consumer.close(true);
-`;
-}
-
-function createHandlerErrorSource(): string {
-  return `import { Consumer, Producer } from '@platformatic/kafka';
-import { createPlatformaticRuntimeClient } from 'kafka-typegen/runtime';
-import { SchemaRegistryConfig, createClient } from './generated/kafka/index.js';
-
-const producer = new Producer({
-  bootstrapBrokers: ['${environment.kafkaBroker}'],
-  clientId: 'handler-error-producer'
-});
-let resolveError: ((message: string) => void) | undefined;
-const handlerError = new Promise<string>((resolve, reject) => {
-  resolveError = resolve;
-  setTimeout(() => reject(new Error('Timed out waiting for handler error.')), 60_000).unref();
-});
-const client = createClient(createPlatformaticRuntimeClient({
-  consumer: new Consumer({
-    bootstrapBrokers: ['${environment.kafkaBroker}'],
-    clientId: 'handler-error-consumer',
-    groupId: 'handler-error-consumer-group'
-  }),
-  onError(error) {
-    resolveError?.(error instanceof Error ? error.message : String(error));
-  },
-  producer,
-  schemaRegistry: SchemaRegistryConfig
-}));
-
-await client.consumer.events.userCreated.on(async () => {
-  throw new Error('handler failed');
-}, {
-  autocommit: true,
-  mode: 'latest'
-});
-await client.producer.events.userCreated.send({
-  email: 'ada@example.com',
-  id: 'user-1',
-  isAdmin: true
-});
-
-console.log('HANDLER_ERROR:' + await handlerError);
-await client.producer.close();
-await client.consumer.close(true);
-`;
-}
-
-function createConflictingOptionsSource(): string {
-  return `import { Consumer } from '@platformatic/kafka';
-import { createPlatformaticRuntimeConsumer } from 'kafka-typegen/runtime';
-import {
-  SchemaRegistryConfig,
-  TopicNames,
-  createConsumer
-} from './generated/kafka/index.js';
-
-const consumer = createConsumer(createPlatformaticRuntimeConsumer({
-  consumer: new Consumer({
-    bootstrapBrokers: ['${environment.kafkaBroker}'],
-    clientId: 'conflicting-options-consumer',
-    groupId: 'conflicting-options-consumer-group'
-  }),
-  schemaRegistry: SchemaRegistryConfig
-}));
-
-await consumer.events.userCreated.on(async () => {}, {
-  autocommit: true,
-  mode: 'latest'
-});
-
-try {
-  await consumer.onTopic(TopicNames.UserEvents, async () => {}, {
-    autocommit: false,
-    mode: 'latest'
-  });
-  throw new Error('Expected conflicting consume options to fail.');
-} catch (error) {
-  console.log('CONFLICT:' + (error instanceof Error ? error.message : String(error)));
-} finally {
-  await consumer.close(true);
-}
 `;
 }
 
@@ -757,4 +437,25 @@ function createIncompatibleUserCreatedSchema(): string {
     null,
     2
   );
+}
+
+function createRunId(): string {
+  runSequence += 1;
+  return `ktg-${runSequence}-${randomUUID().slice(0, 8)}`;
+}
+
+async function renderAppFixtureFiles(
+  fixtureNames: readonly IntegrationAppFixtureName[],
+  runId: string
+): Promise<Record<string, string>> {
+  const files: Record<string, string> = {};
+
+  for (const fixtureName of fixtureNames) {
+    files[fixtureName] = await renderIntegrationAppFixture(fixtureName, {
+      kafkaBroker: environment.kafkaBroker,
+      runId
+    });
+  }
+
+  return files;
 }

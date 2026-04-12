@@ -1,0 +1,40 @@
+// Runtime negative test: sends a payload that intentionally violates the Avro schema
+// and asserts the generated producer rejects with a visible serialization error.
+import { Producer } from '@platformatic/kafka';
+import { createPlatformaticRuntimeProducer } from 'kafka-typegen/runtime';
+import {
+  SchemaRegistryConfig,
+  createProducer,
+  type UserCreatedPayload
+} from './generated/kafka/index.js';
+
+const producer = createProducer(createPlatformaticRuntimeProducer({
+  producer: new Producer({
+    bootstrapBrokers: ['{{KAFKA_BROKER}}'],
+    clientId: '{{RUN_ID}}-invalid-produce'
+  }),
+  schemaRegistry: SchemaRegistryConfig
+}));
+
+let rejectionMessage: string | undefined;
+
+try {
+  // Intentional schema violation: required `email` and `isAdmin` fields are missing.
+  await producer.events.userCreated.send({
+    id: 'broken'
+  } as unknown as UserCreatedPayload);
+} catch (error) {
+  rejectionMessage = String(error);
+} finally {
+  await producer.close();
+}
+
+if (rejectionMessage === undefined) {
+  throw new Error('Expected invalid payload send to reject.');
+}
+
+if (!rejectionMessage.includes('invalid')) {
+  throw new Error(`Unexpected send rejection message: ${rejectionMessage}`);
+}
+
+console.log('SEND_REJECTED:' + rejectionMessage);

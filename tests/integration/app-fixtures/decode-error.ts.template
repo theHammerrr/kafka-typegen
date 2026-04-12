@@ -1,0 +1,75 @@
+// Runtime negative test: injects an invalid Confluent wire-format payload with a
+// non-existent schema id and asserts the consumer `onError` hook receives it.
+import { Buffer } from 'node:buffer';
+
+import { Consumer, Producer } from '@platformatic/kafka';
+import { createPlatformaticRuntimeConsumer } from 'kafka-typegen/runtime';
+import {
+  EventNames,
+  SchemaRegistryConfig,
+  TopicNames,
+  createConsumer,
+  type TopicName
+} from './generated/kafka/index.js';
+
+const producer = new Producer({
+  bootstrapBrokers: ['{{KAFKA_BROKER}}'],
+  clientId: '{{RUN_ID}}-decode-error-producer'
+});
+let resolveError: ((message: string) => void) | undefined;
+const consumerError = new Promise<string>((resolve, reject) => {
+  resolveError = resolve;
+  setTimeout(() => reject(new Error('Timed out waiting for decode error.')), 60_000).unref();
+});
+const consumer = createConsumer(createPlatformaticRuntimeConsumer({
+  consumer: new Consumer({
+    bootstrapBrokers: ['{{KAFKA_BROKER}}'],
+    clientId: '{{RUN_ID}}-decode-error-consumer',
+    groupId: '{{RUN_ID}}-decode-error-consumer-group'
+  }),
+  onError(error) {
+    resolveError?.(String(error));
+  },
+  schemaRegistry: SchemaRegistryConfig
+}));
+const userEventsTopicName = resolveTopicName('user.events');
+
+await consumer.events.userCreated.on(async () => {}, {
+  autocommit: true,
+  mode: 'latest'
+});
+// Intentional decode failure: schema id 999999 is not registered in Schema Registry.
+const invalidPayload = Buffer.alloc(5);
+invalidPayload[0] = 0;
+invalidPayload.writeUInt32BE(999_999, 1);
+await producer.send({
+  acks: -1,
+  messages: [{
+    headers: new Map([
+      [Buffer.from('x-kafka-typegen-event'), Buffer.from(EventNames.UserCreated)]
+    ]),
+    topic: userEventsTopicName,
+    value: invalidPayload
+  }]
+});
+
+const errorMessage = await consumerError;
+if (!errorMessage.includes('999999')) {
+  throw new Error(`Unexpected consumer decode error message: ${errorMessage}`);
+}
+
+console.log('CONSUMER_ERROR:' + errorMessage);
+await producer.close();
+await consumer.close(true);
+
+function resolveTopicName(topicSuffix: string): TopicName {
+  const topicName = Object.values(TopicNames).find((candidate) =>
+    candidate.endsWith(`.${topicSuffix}`)
+  );
+
+  if (topicName === undefined) {
+    throw new Error(`Topic name not found for suffix '${topicSuffix}'.`);
+  }
+
+  return topicName as TopicName;
+}
