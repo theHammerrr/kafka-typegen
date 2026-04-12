@@ -69,8 +69,6 @@ export function normalizeConfig(config: KafkaTypegenConfig): NormalizedKafkaType
   return {
     events: topics.flatMap((topic) => topic.events),
     generation: {
-      clientName: config.generation?.clientName ?? 'KafkaTypegenClient',
-      ...(config.generation?.packageName !== undefined ? { packageName: config.generation.packageName } : {}),
       typesFileName: config.generation?.typesFileName ?? 'kafka-client.ts'
     },
     naming: {

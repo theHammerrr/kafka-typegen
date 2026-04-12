@@ -83,20 +83,17 @@ That generated module gives you:
 - `TopicNames.UserEvents`
 - `createClient(runtime)` to bind producer and consumer together
 
-## Generated Import Ergonomics
+## Generated Imports
 
-The generated client is still application-specific code, so it is not exported from the published `kafka-typegen` package itself. Instead, `kafka-typegen` can generate a small local package wrapper so your app imports the generated symbols from a stable package-like path.
+The generated client is application-specific code, so it is not exported from the published `kafka-typegen` package itself. Generate it into your source tree and import it directly from the generated file or the generated `index.ts` re-export.
 
-Configure a package name:
+Example config:
 
 ```ts
 import { defineConfig } from 'kafka-typegen';
 
 export default defineConfig({
   outputDir: './src/generated/kafka',
-  generation: {
-    packageName: '@app/kafka'
-  },
   sources: {
     rootDir: './schemas'
   },
@@ -114,15 +111,12 @@ export default defineConfig({
 });
 ```
 
-With `generation.packageName` set, the generator emits:
+The generator emits:
 
 - your generated client file
 - an `index.ts` re-export file
-- a generated `package.json`
 
-That generated package is a **TypeScript source package**, not a precompiled JavaScript package. Keep `outputDir` inside your application source tree and include it in your app's TypeScript build so `@app/kafka` is compiled together with the rest of your code.
-
-That lets your application code import the generated API from one stable local package path:
+That lets your application code import the generated API directly:
 
 ```ts
 import {
@@ -132,10 +126,8 @@ import {
   createProducer,
   type EventName,
   type TopicName
-} from '@app/kafka';
+} from './generated/kafka/index.js';
 ```
-
-This is the closest equivalent to the Prisma-style experience in this package today: the library generates a local package for your app, rather than trying to ship app-specific types from `kafka-typegen` itself.
 
 ## Install
 
@@ -161,6 +153,8 @@ The repository includes `.github/workflows/publish.yml`, which runs on every pus
 This is intentionally a canary flow rather than a stable `latest` release flow. npm will not accept re-publishing the same version for every commit, so each `main` push must publish a unique prerelease version.
 
 To enable publishing, set the `NPM_TOKEN` GitHub Actions secret for the repository.
+
+See `CHANGELOG.md` for release history.
 
 ## Quick Start
 
@@ -276,8 +270,6 @@ interface KafkaTypegenConfig {
     };
   };
   generation?: {
-    clientName?: string;
-    packageName?: string;
     typesFileName?: string;
   };
   naming?: {
@@ -323,11 +315,34 @@ interface KafkaTypegenConfig {
 - If `runtime.module` is omitted:
   - `kafkajs` defaults to `kafka-typegen/runtime`
   - `@platformatic/kafka` defaults to `kafka-typegen/runtime/platformatic`
-- `generation.packageName`, when set, emits a local package wrapper so the generated client can be imported from a stable package path.
+- `generation.typesFileName`, when set, controls the generated client filename. The generator also emits `index.ts` unless the filename is already `index.ts`.
 - `sync.kafka` config is used only by the `sync` CLI command.
 - `schemaRegistry` is the single source of truth for Schema Registry connection details.
 - `sync.schemaRegistry` controls registry sync policy only.
 - If `sync.kafka` is configured, every topic must provide `sync.partitions` and `sync.replicationFactor`.
+
+## Avro Type Support
+
+Supported schema constructs:
+
+- top-level `record` schemas
+- primitive types: `null`, `boolean`, `int`, `long`, `float`, `double`, `bytes`, `string`
+- unions, including nullable unions like `['null', 'string']`
+- arrays and maps
+- inline nested records
+- named nested `record`, `enum`, and `fixed` declarations, including references by short or fully-qualified name inside the same schema file
+- logical types:
+  - `uuid` -> `string`
+  - `date`, `time-millis`, `timestamp-millis`, `timestamp-micros` -> `number`
+  - `decimal` -> `Uint8Array`
+
+Current limitations:
+
+- the schema root must be a `record`
+- cross-file Avro named references are not resolved yet
+- `long` and time/date logical types are currently represented as `number`, not `bigint` or `Date`
+- `decimal` is represented as raw `Uint8Array`
+- unsupported or malformed schema shapes fail generation with an explicit error instead of falling back to `unknown`
 
 ### Sync Config Example
 
@@ -532,7 +547,7 @@ Generic runtime example:
 
 ```ts
 import { createRuntimeClient } from 'kafka-typegen/runtime';
-import { SchemaRegistryConfig } from '@app/kafka';
+import { SchemaRegistryConfig } from './generated/kafka/index.js';
 
 const runtime = createRuntimeClient({
   producerTransport,
@@ -551,7 +566,7 @@ Platformatic example:
 ```ts
 import { Consumer, Producer } from '@platformatic/kafka';
 import { createPlatformaticRuntimeClient } from 'kafka-typegen/runtime';
-import { SchemaRegistryConfig, createClient } from '@app/kafka';
+import { SchemaRegistryConfig, createClient } from './generated/kafka/index.js';
 
 const runtime = createPlatformaticRuntimeClient({
   producer: new Producer({
@@ -595,7 +610,7 @@ Generic runtime:
 
 ```ts
 import { createRuntimeConsumer, createRuntimeProducer } from 'kafka-typegen/runtime';
-import { createConsumer, createProducer } from '@app/kafka';
+import { createConsumer, createProducer } from './generated/kafka/index.js';
 
 const runtimeProducer = createRuntimeProducer({
   producerTransport: {
@@ -638,7 +653,7 @@ Platformatic runtime:
 ```ts
 import { Producer } from '@platformatic/kafka';
 import { createPlatformaticRuntimeProducer } from 'kafka-typegen/runtime';
-import { createProducer } from '@app/kafka';
+import { createProducer } from './generated/kafka/index.js';
 
 const runtimeProducer = createPlatformaticRuntimeProducer({
   producer: new Producer({
@@ -670,7 +685,7 @@ And the consumer-only path works the same way:
 ```ts
 import { Consumer } from '@platformatic/kafka';
 import { createPlatformaticRuntimeConsumer } from 'kafka-typegen/runtime';
-import { SchemaRegistryConfig, createConsumer } from '@app/kafka';
+import { SchemaRegistryConfig, createConsumer } from './generated/kafka/index.js';
 
 const runtimeConsumer = createPlatformaticRuntimeConsumer({
   consumer: new Consumer({

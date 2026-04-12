@@ -1,16 +1,27 @@
 import type { EventCatalog } from '../catalog/index.js';
 
+import { collectAvroDeclarations } from './avro-declarations.js';
 import { toTypeScriptType } from './avro-type-renderer.js';
 import { formatLiteral, formatPropertyName, indent } from './render-utils.js';
 
 export function emitPayloadInterfaces(catalog: EventCatalog): string {
   return catalog.events
     .map((event) => {
+      const { declarations, references } = collectAvroDeclarations(
+        event.schema.rawSchema,
+        event.payloadTypeName
+      );
       const fields = event.schema.fields.map(
-        (field) => `${formatPropertyName(field.name)}: ${toTypeScriptType(field.rawType)};`
+        (field) => `${formatPropertyName(field.name)}: ${toTypeScriptType(field.rawType, {
+          path: field.path,
+          references
+        })};`
       );
 
-      return `export interface ${event.payloadTypeName} {\n${indent(fields.join('\n'))}\n}`;
+      return [
+        ...declarations,
+        `export interface ${event.payloadTypeName} {\n${indent(fields.join('\n'))}\n}`
+      ].join('\n\n');
     })
     .join('\n\n');
 }

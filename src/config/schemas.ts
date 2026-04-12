@@ -39,8 +39,6 @@ const topicConfigSchema = z.object({
 export const kafkaTypegenConfigSchema = z.object({
   generation: z
     .object({
-      clientName: nonEmptyStringSchema.optional(),
-      packageName: nonEmptyStringSchema.optional(),
       typesFileName: nonEmptyStringSchema.optional()
     })
     .strict()

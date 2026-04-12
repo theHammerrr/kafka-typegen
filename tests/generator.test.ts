@@ -82,11 +82,8 @@ describe('type generation', () => {
     expect(normalizeLineEndings(contents)).toBe(normalizeLineEndings(expected));
   });
 
-  it('emits a local package wrapper when packageName is configured', async () => {
+  it('emits only a source-file and index re-export for direct relative imports', async () => {
     const output = await buildGeneratedOutput({
-      generation: {
-        packageName: '@acme/generated-kafka'
-      },
       outputDir: './generated',
       sources: {
         rootDir: schemaFixturesDir
@@ -104,18 +101,12 @@ describe('type generation', () => {
       ]
     });
 
-    expect(output.files).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          contents: "export * from './kafka-client.js';\n",
-          filePath: 'index.ts'
-        }),
-        expect.objectContaining({
-          filePath: 'package.json'
-        })
-      ])
-    );
-    expect(output.files.find((file) => file.filePath === 'package.json')?.contents).toContain('"name": "@acme/generated-kafka"');
+    expect(output.files.map((file) => file.filePath)).toEqual([
+      'kafka-client.ts',
+      'index.ts'
+    ]);
+    expect(output.files.find((file) => file.filePath === 'index.ts')?.contents)
+      .toBe("export * from './kafka-client.js';\n");
   });
 
   it('emits a schema registry config constant with url only', async () => {
@@ -153,9 +144,49 @@ describe('type generation', () => {
     expect(contents).not.toContain('registry-user');
   });
 
+  it('emits nested named declarations and logical types from Avro schemas', async () => {
+    const output = await buildGeneratedOutput({
+      outputDir: './generated',
+      sources: {
+        rootDir: schemaFixturesDir
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.profiled',
+              schemaPath: './user-profile.avsc'
+            }
+          ],
+          name: 'user.events'
+        }
+      ]
+    });
+    const contents =
+      output.files.find((file) => file.filePath === 'kafka-client.ts')
+        ?.contents ?? '';
+
+    expect(contents).toContain(`export type UserStatus = 'ACTIVE' | 'DISABLED';`);
+    expect(contents).toContain(`export interface Address {
+  street: string;
+  createdAt: number;
+}`);
+    expect(contents).toContain(`export interface UserProfiledPayload {
+  id: string;
+  status: UserStatus;
+  primaryAddress: Address;
+  shippingAddress: Address;
+  birthDate: number;
+  balance: null | Uint8Array;
+}`);
+  });
+
   it('renders Avro references, logical types, nested records, unions, arrays, maps, and enums', () => {
     expect(toTypeScriptType('com.example.UserCreated')).toBe('UserCreated');
     expect(toTypeScriptType({ logicalType: 'uuid', type: 'string' })).toBe('string');
+    expect(toTypeScriptType({ logicalType: 'date', type: 'int' })).toBe('number');
+    expect(toTypeScriptType({ logicalType: 'timestamp-millis', type: 'long' })).toBe('number');
+    expect(toTypeScriptType({ logicalType: 'decimal', type: 'bytes' })).toBe('Uint8Array');
     expect(toTypeScriptType(['null', 'string'])).toBe('null | string');
     expect(toTypeScriptType({
       items: 'string',
@@ -188,10 +219,10 @@ describe('type generation', () => {
       'Unsupported Avro complex type'
     );
     expect(() => toTypeScriptType(42)).toThrowError(
-      "Unsupported Avro type definition '42'."
+      "Unsupported Avro type definition at 'schema': 42."
     );
     expect(() => toTypeScriptType('not a valid type name')).toThrowError(
-      "Unsupported Avro type 'not a valid type name'."
+      "Unsupported Avro type 'not a valid type name' at 'schema'."
     );
   });
 });

@@ -15,31 +15,3 @@ export function emitGeneratedIndexFile(catalog: EventCatalog): GeneratedFile | u
     filePath: 'index.ts'
   };
 }
-
-export function emitGeneratedPackageFile(catalog: EventCatalog): GeneratedFile | undefined {
-  const packageName = catalog.config.generation.packageName;
-  if (packageName === undefined) {
-    return undefined;
-  }
-
-  return {
-    contents: `${JSON.stringify(
-      {
-        main: './index.ts',
-        name: packageName,
-        private: true,
-        type: 'module',
-        types: './index.ts',
-        exports: {
-          '.': {
-            default: './index.ts',
-            types: './index.ts'
-          }
-        }
-      },
-      null,
-      2
-    )}\n`,
-    filePath: 'package.json'
-  };
-}

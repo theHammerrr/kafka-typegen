@@ -47,8 +47,6 @@ export interface KafkaTypegenSourcesConfig {
 }
 
 export interface KafkaTypegenGenerationConfig {
-  readonly clientName?: string;
-  readonly packageName?: string;
   readonly typesFileName?: string;
 }
 
@@ -162,8 +160,6 @@ export interface NormalizedSourcesConfig {
 }
 
 export interface NormalizedGenerationConfig {
-  readonly clientName: string;
-  readonly packageName?: string;
   readonly typesFileName: string;
 }
 
