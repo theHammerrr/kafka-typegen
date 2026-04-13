@@ -41,6 +41,7 @@ const topicConfigSchema = z.object({
 export const kafkaTypegenConfigSchema = z.object({
   generation: z
     .object({
+      apiMode: z.enum(['minimal', 'advanced']).optional(),
       avroExternalTypes: z.record(nonEmptyStringSchema, nonEmptyStringSchema).optional(),
       avroSemanticMode: z.enum(['default', 'safe']).optional(),
       typesFileName: nonEmptyStringSchema.optional()

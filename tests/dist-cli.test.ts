@@ -9,18 +9,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 const execFileAsync = promisify(execFile);
 const cliPath = resolvePath('dist', 'cli.cjs');
 const schemaFixturesDir = resolvePath('tests', 'fixtures', 'schemas');
+const tsupCliPath = resolvePath('..', '..', 'node_modules', 'tsup', 'dist', 'cli-default.js');
 const tempDirs: string[] = [];
 
 beforeAll(async () => {
-  await (process.platform === 'win32'
-    ? execFileAsync(
-        process.env.ComSpec ?? 'cmd.exe',
-        ['/d', '/s', '/c', 'pnpm build'],
-        { cwd: resolvePath('.') }
-      )
-    : execFileAsync('pnpm', ['build'], {
-        cwd: resolvePath('.')
-      }));
+  await execFileAsync(process.execPath, [tsupCliPath], {
+    cwd: resolvePath('.')
+  });
 }, 60000);
 
 afterAll(async () => {
@@ -72,6 +67,7 @@ describe('built CLI artifact', () => {
     );
 
     expect(stdout).toContain('Generated 2 file(s)');
-    expect(generatedContents).toContain("export const EventNames = {");
+    expect(generatedContents).toContain('export interface GeneratedProducerTopics');
+    expect(generatedContents).toContain('userEvents: {');
   });
 });

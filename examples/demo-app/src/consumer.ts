@@ -17,21 +17,29 @@ const consumer = async () => {
         })
     )
 
-    consumer.events.userCreated.on(async (message) => {
+    consumer.userEvents.userCreated.on(async (message) => {
+        console.log(`event ${message.event}, payload: ${JSON.stringify(message.payload)}`);
+    });
+
+    consumer.userEvents.userDeleted.on(async (message) => {
         console.log(`event ${message.event}, payload: ${JSON.stringify(message.payload)}`);
     })
 
-    consumer.events.userDeleted.on(async (message) => {
+    consumer.productEvents.productCreated.on(async (message) => {
+        const createdAt = new Date(message.payload.createdAt);
+        const productId = message.payload.id;
         console.log(`event ${message.event}, payload: ${JSON.stringify(message.payload)}`);
+        console.log(`product id: ${productId} created at: ${createdAt}`);
+        
     })
 
     process.once('SIGINT', async () => {
-        await consumer.close(true);
+        await consumer.close({force: true});
         process.exit(0);
     });
 
     process.once('SIGTERM', async () => {
-        await consumer.close(true);
+        await consumer.close({force: true});
         process.exit(0);
     });
 }

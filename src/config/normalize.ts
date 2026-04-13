@@ -69,6 +69,7 @@ export function normalizeConfig(config: KafkaTypegenConfig): NormalizedKafkaType
   return {
     events: topics.flatMap((topic) => topic.events),
     generation: {
+      apiMode: config.generation?.apiMode ?? 'minimal',
       avroExternalTypes: Object.fromEntries(
         Object.entries(config.generation?.avroExternalTypes ?? {}).sort(([left], [right]) =>
           left.localeCompare(right)

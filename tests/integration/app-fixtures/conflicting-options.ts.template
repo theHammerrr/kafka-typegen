@@ -4,9 +4,7 @@ import { Consumer } from '@platformatic/kafka';
 import { createPlatformaticRuntimeConsumer } from 'kafka-typegen/runtime';
 import {
   SchemaRegistryConfig,
-  TopicNames,
-  createConsumer,
-  type TopicName
+  createConsumer
 } from './generated/kafka/index.js';
 
 const consumer = createConsumer(createPlatformaticRuntimeConsumer({
@@ -17,16 +15,16 @@ const consumer = createConsumer(createPlatformaticRuntimeConsumer({
   }),
   schemaRegistry: SchemaRegistryConfig
 }));
-const userEventsTopicName = resolveTopicName('user.events');
+const userEventsTopicName = 'user.events';
 
-await consumer.events.userCreated.on(async () => {}, {
+await consumer.userEvents.userCreated.on(async () => {}, {
   autocommit: true,
   mode: 'latest'
 });
 
 try {
   // Intentional option conflict: `user.created` already opened this topic stream with autocommit=true.
-  await consumer.onTopic(userEventsTopicName, async () => {}, {
+  await consumer.userEvents.on?.(async () => {}, {
     autocommit: false,
     mode: 'latest'
   });
@@ -42,16 +40,4 @@ try {
   console.log('CONFLICT:' + errorMessage);
 } finally {
   await consumer.close({ force: true });
-}
-
-function resolveTopicName(topicSuffix: string): TopicName {
-  const topicName = Object.values(TopicNames).find((candidate) =>
-    candidate.endsWith(`.${topicSuffix}`)
-  );
-
-  if (topicName === undefined) {
-    throw new Error(`Topic name not found for suffix '${topicSuffix}'.`);
-  }
-
-  return topicName as TopicName;
 }

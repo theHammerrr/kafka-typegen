@@ -20,7 +20,7 @@ let rejectionMessage: string | undefined;
 
 try {
   // Intentional schema violation: required `email` and `isAdmin` fields are missing.
-  await producer.events.userCreated.send({
+await producer.userEvents.userCreated.send({
     id: 'broken'
   } as unknown as UserCreatedPayload);
 } catch (error) {

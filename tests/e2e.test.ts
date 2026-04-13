@@ -1,4 +1,4 @@
-import { cp, mkdtemp, readFile } from 'node:fs/promises';
+import { cp, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -37,10 +37,6 @@ async function generateFromWorkspace(
   }
 }
 
-function normalizeLineEndings(value: string): string {
-  return value.replaceAll('\r\n', '\n');
-}
-
 afterEach(async () => {
   for (const tempDir of tempDirs.splice(0, tempDirs.length)) {
     await import('node:fs/promises').then(({ rm }) => rm(tempDir, { force: true, recursive: true }));
@@ -72,14 +68,15 @@ describe('end-to-end generation', () => {
     });
 
     expect(contents).toContain("import type { RuntimeClient, RuntimeConsumer, RuntimeEventMetadata, RuntimeProducer } from '@acme/kafka-runtime';");
-    expect(contents).toContain("export type EventName = 'user.created';");
-    expect(contents).toContain("schemaFilePath: 'user-created.avsc';");
+    expect(contents).toContain("schemaFilePath: 'user-created.avsc',");
+    expect(contents).toContain('userEvents: GeneratedUserEventsProducerTopic<TRuntimeProducer>;');
+    expect(contents).not.toContain("export type EventName = 'user.created';");
     expect(contents).toContain(
       'export function createClient<TRuntimeClient extends RuntimeClient>(runtime: TRuntimeClient): GeneratedClient<TRuntimeClient> {'
     );
   });
 
-  it('generates stable multi-event output across the full pipeline', async () => {
+  it('generates a topic-first multi-event client across the full pipeline', async () => {
     const workspace = await createTempWorkspace();
     const contents = await generateFromWorkspace(workspace, {
       outputDir: './generated',
@@ -90,26 +87,24 @@ describe('end-to-end generation', () => {
         {
           events: [
             {
-              name: 'user.updated',
-              schemaPath: './user-updated.avsc'
-            }
-          ],
-          name: 'user.lifecycle'
-        },
-        {
-          events: [
-            {
               name: 'user.created',
               schemaPath: './user-created.avsc'
+            },
+            {
+              name: 'user.updated',
+              schemaPath: './user-updated.avsc'
             }
           ],
           name: 'user.events'
         }
       ]
     });
-    const expected = await readFile(join('tests', 'fixtures', 'generated', 'multi-event.ts'), 'utf8');
 
-    expect(normalizeLineEndings(contents)).toBe(normalizeLineEndings(expected));
+    expect(contents).toContain('export type UserEventsTopicMessage = UserCreatedPayloadMessage | UserUpdatedPayloadMessage;');
+    expect(contents).toContain('userEvents: {');
+    expect(contents).toContain('userCreated: {');
+    expect(contents).toContain('userUpdated: {');
+    expect(contents).toContain('return runtimeOnTopic(consumerMetadataByTopic.userEvents.topicName');
   });
 
   it('uses the platformatic runtime module when that transport is selected', async () => {

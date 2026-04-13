@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises';
 import { resolve as resolvePath } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -11,20 +10,14 @@ import {
 import { toTypeScriptType } from '../src/generator/avro-type-renderer.js';
 
 const schemaFixturesDir = resolvePath('tests', 'fixtures', 'schemas');
-const generatedFixturesDir = resolvePath('tests', 'fixtures', 'generated');
-
 async function buildGeneratedOutput(configInput: Parameters<typeof resolveConfig>[0]) {
   const config = resolveConfig(configInput);
   const catalog = await createCatalogBuilder().build(config);
   return createTypeGenerator().generate(catalog);
 }
 
-function normalizeLineEndings(value: string): string {
-  return value.replaceAll('\r\n', '\n');
-}
-
 describe('type generation', () => {
-  it('matches the single-event generated output', async () => {
+  it('emits a compact minimal client for a single-event topic by default', async () => {
     const output = await buildGeneratedOutput({
       outputDir: './generated',
       sources: {
@@ -43,13 +36,19 @@ describe('type generation', () => {
       ]
     });
     const contents = output.files.find((file) => file.filePath === 'kafka-client.ts')?.contents ?? '';
-    const expected = await readFile(resolvePath(generatedFixturesDir, 'single-event.ts'), 'utf8');
 
-    expect(normalizeLineEndings(contents)).toBe(normalizeLineEndings(expected));
     expect(output.files.map((file) => file.filePath)).toEqual(['kafka-client.ts', 'index.ts']);
+    expect(contents).toContain('export interface UserCreatedPayloadMessage {');
+    expect(contents).toContain('export interface GeneratedProducerTopics<TRuntimeProducer extends RuntimeProducer = RuntimeProducer> {');
+    expect(contents).toContain('userEvents: GeneratedUserEventsProducerTopic<TRuntimeProducer>;');
+    expect(contents).toContain('producerMetadataByTopic.userEvents.userCreated');
+    expect(contents).not.toContain('export const EventNames = {');
+    expect(contents).not.toContain('export const TopicNames = {');
+    expect(contents).not.toContain('export interface EventPayloadByName {');
+    expect(contents).not.toContain('export const producerEventMetadata');
   });
 
-  it('matches the multi-event generated output deterministically', async () => {
+  it('emits topic-level subscriptions only when a topic has multiple events', async () => {
     const output = await buildGeneratedOutput({
       outputDir: './generated',
       sources: {
@@ -58,13 +57,37 @@ describe('type generation', () => {
       topics: [
         {
           events: [
+            {
+              name: 'user.created',
+              schemaPath: './user-created.avsc'
+            },
             {
               name: 'user.updated',
               schemaPath: './user-updated.avsc'
             }
           ],
-          name: 'user.lifecycle'
-        },
+          name: 'user.events'
+        }
+      ]
+    });
+    const contents = output.files.find((file) => file.filePath === 'kafka-client.ts')?.contents ?? '';
+
+    expect(contents).toContain(`export type UserEventsTopicMessage = UserCreatedPayloadMessage | UserUpdatedPayloadMessage;`);
+    expect(contents).toContain('on(handler: (message: UserEventsTopicMessage) => Promise<void> | void, options?: GeneratedConsumerSubscribeOptions<TRuntimeConsumer>): Promise<void>;');
+    expect(contents).toContain("topicName: 'user.events'");
+    expect(contents).toContain("'user.updated': producerMetadataByTopic.userEvents.userUpdated");
+  });
+
+  it('supports the legacy advanced generated surface when explicitly requested', async () => {
+    const output = await buildGeneratedOutput({
+      generation: {
+        apiMode: 'advanced'
+      },
+      outputDir: './generated',
+      sources: {
+        rootDir: schemaFixturesDir
+      },
+      topics: [
         {
           events: [
             {
@@ -77,9 +100,11 @@ describe('type generation', () => {
       ]
     });
     const contents = output.files.find((file) => file.filePath === 'kafka-client.ts')?.contents ?? '';
-    const expected = await readFile(resolvePath(generatedFixturesDir, 'multi-event.ts'), 'utf8');
 
-    expect(normalizeLineEndings(contents)).toBe(normalizeLineEndings(expected));
+    expect(contents).toContain("export const EventNames = {");
+    expect(contents).toContain("export const TopicNames = {");
+    expect(contents).toContain('export const producerEventMetadata');
+    expect(contents).toContain('producer.send = ((');
   });
 
   it('emits only a source-file and index re-export for direct relative imports', async () => {

@@ -588,6 +588,7 @@ describe('config normalization', () => {
     expect(normalized.sources.rootDir).toBe(resolvePath('./fixtures'));
     expect(normalized.resolvedOutputDir).toBe(resolvePath('./generated'));
     expect(normalized.generation).toEqual({
+      apiMode: 'minimal',
       avroExternalTypes: {},
       avroSemanticMode: 'default',
       typesFileName: 'types.ts'
@@ -707,6 +708,7 @@ describe('config normalization', () => {
     });
 
     expect(normalized.generation).toEqual({
+      apiMode: 'minimal',
       avroExternalTypes: {
         'com.alpha.Address': "import('./types.js').AlphaAddress",
         'com.zeta.Address': "import('./types.js').ZetaAddress"
