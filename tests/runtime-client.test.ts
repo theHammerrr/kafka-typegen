@@ -20,26 +20,41 @@ const schemaFixturesDir = resolvePath('tests', 'fixtures', 'schemas');
 type GeneratedClientModule = {
   createClient: (runtime: ReturnType<typeof createRuntimeClient>) => {
     producer: {
-      send: (event: string, payload: unknown) => Promise<void>;
-      events: {
+      userEvents?: {
         userCreated?: {
+          send: (payload: unknown, options?: unknown) => Promise<void>;
+        };
+        userProfiled?: {
+          send: (payload: unknown, options?: unknown) => Promise<void>;
+        };
+      };
+      userLifecycle?: {
+        userUpdated?: {
           send: (payload: unknown, options?: unknown) => Promise<void>;
         };
       };
     };
     consumer: {
-      on: (
-        event: string,
-        handler: (message: unknown) => Promise<void> | void,
-        options?: unknown
-      ) => Promise<void>;
-      onTopic: (
-        topic: string,
-        handler: (message: unknown) => Promise<void> | void,
-        options?: unknown
-      ) => Promise<void>;
-      events: {
+      userEvents?: {
+        on?: (
+          handler: (message: unknown) => Promise<void> | void,
+          options?: unknown
+        ) => Promise<void>;
         userCreated?: {
+          on: (
+            handler: (message: unknown) => Promise<void> | void,
+            options?: unknown
+          ) => Promise<void>;
+        };
+        userProfiled?: {
+          on: (
+            handler: (message: unknown) => Promise<void> | void,
+            options?: unknown
+          ) => Promise<void>;
+        };
+      };
+      userLifecycle?: {
+        userUpdated?: {
           on: (
             handler: (message: unknown) => Promise<void> | void,
             options?: unknown
@@ -51,13 +66,20 @@ type GeneratedClientModule = {
   createConsumer: (
     runtimeConsumer: ReturnType<typeof createRuntimeConsumer>
   ) => {
-    on: (
-      event: string,
-      handler: (message: unknown) => Promise<void> | void,
-      options?: unknown
-    ) => Promise<void>;
-    events: {
+    userEvents?: {
+      on?: (
+        handler: (message: unknown) => Promise<void> | void,
+        options?: unknown
+      ) => Promise<void>;
       userCreated: {
+        on: (
+          handler: (message: unknown) => Promise<void> | void,
+          options?: unknown
+        ) => Promise<void>;
+      };
+    };
+    userLifecycle?: {
+      userUpdated: {
         on: (
           handler: (message: unknown) => Promise<void> | void,
           options?: unknown
@@ -66,9 +88,13 @@ type GeneratedClientModule = {
     };
   };
   createProducer: (runtimeProducer: ReturnType<typeof createRuntimeProducer>) => {
-    send: (event: string, payload: unknown, options?: unknown) => Promise<void>;
-    events: {
+    userEvents?: {
       userCreated: {
+        send: (payload: unknown, options?: unknown) => Promise<void>;
+      };
+    };
+    userLifecycle?: {
+      userUpdated: {
         send: (payload: unknown, options?: unknown) => Promise<void>;
       };
     };
@@ -227,11 +253,11 @@ describe('runtime client integration', () => {
     const client = generatedModule.createClient(runtime);
     const receivedMessages: unknown[] = [];
 
-    await client.consumer.on('user.updated', async (message) => {
+    await client.consumer.userLifecycle?.userUpdated?.on(async (message) => {
       receivedMessages.push(message);
     });
 
-    await client.producer.send('user.updated', {
+    await client.producer.userLifecycle?.userUpdated?.send({
       displayName: 'Ada',
       id: '42',
       metadata: { role: 'admin' }
@@ -320,11 +346,11 @@ describe('runtime client integration', () => {
 
     const producer = generatedModule.createProducer(runtimeProducer);
 
-    await producer.events.userCreated.send({ id: '7' });
+    await producer.userEvents.userCreated.send({ id: '7' });
 
     const receivedMessages: unknown[] = [];
     const consumer = generatedModule.createConsumer(runtimeConsumer);
-    await consumer.events.userCreated.on(async (message) => {
+    await consumer.userEvents.userCreated.on(async (message) => {
       receivedMessages.push(message);
     });
 
@@ -400,12 +426,12 @@ describe('runtime client integration', () => {
     });
 
     const producer = generatedModule.createProducer(runtimeProducer);
-    await producer.send('user.created', { id: '11' }, { acks: -1 });
-    await producer.events.userCreated.send({ id: '12' }, { acks: 1 });
+    await producer.userEvents.userCreated.send({ id: '11' }, { acks: -1 });
+    await producer.userEvents.userCreated.send({ id: '12' }, { acks: 1 });
 
     const consumer = generatedModule.createConsumer(runtimeConsumer);
-    await consumer.on('user.created', async () => {}, { autocommit: false });
-    await consumer.events.userCreated.on(async () => {}, { autocommit: true });
+    await consumer.userEvents.userCreated.on(async () => {}, { autocommit: false });
+    await consumer.userEvents.userCreated.on(async () => {}, { autocommit: true });
 
     expect(sentOptions).toEqual([{ acks: -1 }, { acks: 1 }]);
     expect(subscribeOptions).toEqual([

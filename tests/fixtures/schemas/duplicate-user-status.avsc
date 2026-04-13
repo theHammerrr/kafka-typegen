@@ -1,0 +1,11 @@
+{
+  "type": "record",
+  "name": "UserStatus",
+  "namespace": "com.example.users",
+  "fields": [
+    {
+      "name": "value",
+      "type": "string"
+    }
+  ]
+}

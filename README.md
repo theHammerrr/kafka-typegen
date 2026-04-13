@@ -5,10 +5,9 @@
 The goal is to make Kafka event contracts feel like a real application API instead of a loose collection of topic names and JSON blobs. You declare topics, events, and schema files once, and the generator produces:
 
 - payload interfaces derived from Avro
-- typed event and topic unions
-- event-to-payload and topic-to-event metadata maps
-- typed producer helpers
-- typed consumer helpers
+- typed producer helpers grouped by topic and event
+- typed consumer helpers grouped by topic and event
+- topic-level consumer subscriptions for multi-event topics
 - a composed client API on top of a small runtime abstraction
 
 It supports both single-event and multi-event topics.
@@ -45,7 +44,6 @@ export default defineConfig({
 import type {
   RuntimeClient,
   RuntimeConsumer,
-  RuntimeEventMetadata,
   RuntimeProducer
 } from 'kafka-typegen/runtime';
 
@@ -55,16 +53,11 @@ export interface UserCreatedPayload {
   isAdmin: boolean;
 }
 
-export type EventName = 'user.created';
-export type TopicName = 'user.events';
-
-export const EventNames = {
-  UserCreated: 'user.created'
-} as const;
-
-export const TopicNames = {
-  UserEvents: 'user.events'
-} as const;
+export interface UserCreatedPayloadMessage {
+  event: 'user.created';
+  topic: 'user.events';
+  payload: UserCreatedPayload;
+}
 
 export function createProducer(runtimeProducer: RuntimeProducer) { /* ... */ }
 export function createConsumer(runtimeConsumer: RuntimeConsumer) { /* ... */ }
@@ -73,14 +66,10 @@ export function createClient(runtime: RuntimeClient) { /* ... */ }
 
 That generated module gives you:
 
-- `producer.send('user.created', payload)`
-- `producer.events.userCreated.send(payload)`
-- `consumer.on('user.created', handler)`
-- `consumer.events.userCreated.on(handler)`
-- `consumer.onTopic('user.events', handler)`
-- optional native transport options as the last argument, for example `producer.events.userCreated.send(payload, { acks: -1 })` and `consumer.onTopic('user.events', handler, { autocommit: false })`
-- `EventNames.UserCreated`
-- `TopicNames.UserEvents`
+- `producer.userEvents.userCreated.send(payload)`
+- `consumer.userEvents.userCreated.on(handler)`
+- `consumer.userEvents.on(handler)` when `user.events` has multiple generated events
+- optional native transport options as the last argument, for example `producer.userEvents.userCreated.send(payload, { acks: -1 })`
 - `createClient(runtime)` to bind producer and consumer together
 
 ## Generated Imports
@@ -120,12 +109,8 @@ That lets your application code import the generated API directly:
 
 ```ts
 import {
-  EventNames,
-  TopicNames,
   createClient,
-  createProducer,
-  type EventName,
-  type TopicName
+  createProducer
 } from './generated/kafka/index.js';
 ```
 
@@ -278,6 +263,9 @@ interface KafkaTypegenConfig {
     };
   };
   generation?: {
+    apiMode?: 'minimal' | 'advanced';
+    avroExternalTypes?: Record<string, string>;
+    avroSemanticMode?: 'default' | 'safe';
     typesFileName?: string;
   };
   naming?: {
@@ -324,6 +312,9 @@ interface KafkaTypegenConfig {
   - `kafkajs` defaults to `kafka-typegen/runtime/kafkajs`
   - `@platformatic/kafka` defaults to `kafka-typegen/runtime/platformatic`
 - `generation.typesFileName`, when set, controls the generated client filename. The generator also emits `index.ts` unless the filename is already `index.ts`.
+- `generation.apiMode` defaults to `minimal`. Use `advanced` only if you explicitly want the older metadata-heavy generated surface.
+- `generation.avroExternalTypes` maps Avro named types to TypeScript type expressions for references that are not generated in the same catalog run. Values can be bare type names or expressions such as `import('./shared-types.js').Address`.
+- `generation.avroSemanticMode` defaults to `default`. Use `safe` to render plain Avro `long` values as `bigint` while keeping the existing logical-type aliases.
 - `sync.kafka` config is used only by the `sync` CLI command.
 - `schemaRegistry` is the single source of truth for Schema Registry connection details.
 - `sync.schemaRegistry` controls registry sync policy only.
@@ -336,7 +327,7 @@ interface KafkaTypegenConfig {
 
 Supported schema constructs:
 
-- top-level `record` schemas
+- top-level named `record`, `enum`, and `fixed` schemas
 - primitive types: `null`, `boolean`, `int`, `long`, `float`, `double`, `bytes`, `string`
 - unions, including nullable unions like `['null', 'string']`
 - arrays and maps
@@ -354,12 +345,41 @@ Supported schema constructs:
 
 Current limitations:
 
-- the schema root must be a `record`
-- cross-file references require the referenced schema to be included in the same config/catalog run
-- `long` is currently represented as `number`, not `bigint`
+- cross-file references require the referenced schema to be included in the same config/catalog run unless an explicit `generation.avroExternalTypes` mapping is configured
+- `long` is represented as `number` in the default semantic mode and `bigint` in `generation.avroSemanticMode: 'safe'`
 - `AvroDate`, `AvroTimeMillis`, `AvroTimestampMillis`, and `AvroTimestampMicros` are numeric aliases, not `Date` objects
 - `AvroDecimal` is currently a `Uint8Array` alias
 - unsupported or malformed schema shapes fail generation with an explicit error instead of falling back to `unknown`
+
+### External Avro Type Mappings
+
+Use `generation.avroExternalTypes` when a schema references a named Avro type that is intentionally not part of the current generation run:
+
+```js
+import { defineConfig } from 'kafka-typegen';
+
+export default defineConfig({
+  outputDir: './generated',
+  generation: {
+    avroExternalTypes: {
+      'com.external.Address': "import('./shared-types.js').Address"
+    }
+  },
+  topics: [
+    {
+      name: 'user.events',
+      events: [
+        {
+          name: 'user.created',
+          schemaPath: './user-created.avsc'
+        }
+      ]
+    }
+  ]
+});
+```
+
+This is a TypeScript type-resolution feature only. It does not load remote Avro schemas or fetch types from Schema Registry.
 
 ### Sync Config Example
 
@@ -411,6 +431,27 @@ export default defineConfig({
 ## Runtime Usage
 
 The generated client is transport-agnostic. It talks to a runtime interface, and this package ships generic, KafkaJS, and Platformatic runtime entrypoints.
+
+### Observability
+
+Runtime and sync entrypoints accept optional observability hooks:
+
+```ts
+type KafkaTypegenLogger = {
+  debug(message: string, context?: Record<string, unknown>): void;
+  info(message: string, context?: Record<string, unknown>): void;
+  warn(message: string, context?: Record<string, unknown>): void;
+  error(message: string, context?: Record<string, unknown>): void;
+};
+
+type KafkaTypegenObserver = {
+  onEvent(event: KafkaTypegenObservedEvent): void | Promise<void>;
+};
+```
+
+- `logger` is used for diagnostics and internal failures. If omitted, `kafka-typegen` falls back to `console`.
+- `observer` receives structured runtime and sync events such as send/handle start-success-failure and sync start-complete-failure.
+- These hooks are additive. Operations still throw or fail through their normal control-flow APIs.
 
 ### Generic runtime
 
@@ -468,7 +509,7 @@ const client = createClient(runtime);
 await client.producer.connect();
 await client.consumer.connect();
 
-await client.consumer.events.userCreated.on(async (message) => {
+await client.consumer.userEvents.userCreated.on(async (message) => {
   console.log(message.payload.email);
 }, {
   fromBeginning: true
@@ -476,7 +517,7 @@ await client.consumer.events.userCreated.on(async (message) => {
 
 await client.consumer.run();
 
-await client.producer.events.userCreated.send({
+await client.producer.userEvents.userCreated.send({
   id: 'user_1',
   email: 'ada@example.com',
   isAdmin: true
@@ -649,7 +690,7 @@ schemaRegistry: createConfluentSchemaRegistryRuntimeClient({
 
 The direct config form is the simplest default and is the recommended path unless you already need to manage the registry client yourself.
 
-At runtime, the library uses generated event metadata such as `subjectName`, `eventName`, and `topicName` to:
+At runtime, the library uses generated internal event metadata such as `subjectName`, `eventName`, and `topicName` to:
 
 - resolve the latest schema for a subject on the producer side
 - encode payloads with Avro
@@ -765,7 +806,7 @@ const runtimeProducer = createRuntimeProducer({
 });
 
 const producer = createProducer(runtimeProducer);
-await producer.events.userCreated.send({
+await producer.userEvents.userCreated.send({
   id: 'user_1',
   email: 'ada@example.com',
   isAdmin: true
@@ -807,7 +848,7 @@ const runtimeProducer = createPlatformaticRuntimeProducer({
 });
 
 const producer = createProducer(runtimeProducer);
-await producer.events.userCreated.send({
+await producer.userEvents.userCreated.send({
   id: 'user_1',
   email: 'ada@example.com',
   isAdmin: true
@@ -831,7 +872,7 @@ const runtimeConsumer = createPlatformaticRuntimeConsumer({
 });
 
 const consumer = createConsumer(runtimeConsumer);
-await consumer.events.userCreated.on(async (message) => {
+await consumer.userEvents.userCreated.on(async (message) => {
   message.payload.isAdmin;
 }, {
   autocommit: false

@@ -7,7 +7,10 @@ import { validateIdentifierCollisions } from './validation.js';
 
 export class DefaultCatalogBuilder implements CatalogBuilder {
   public async build(config: NormalizedKafkaTypegenConfig): Promise<EventCatalog> {
-    const schemaDefinitions = await createEventSchemaLoader().loadEventSchemas(config.events);
+    const schemaDefinitions = await createEventSchemaLoader().loadEventSchemas(
+      config.events,
+      { externalTypeMappings: config.generation.avroExternalTypes }
+    );
     const events = buildCatalogEvents(config, schemaDefinitions);
     const topics = buildCatalogTopics(config, events);
 

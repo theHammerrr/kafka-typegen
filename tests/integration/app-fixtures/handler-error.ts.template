@@ -26,14 +26,14 @@ const client = createClient(createPlatformaticRuntimeClient({
   schemaRegistry: SchemaRegistryConfig
 }));
 
-await client.consumer.events.userCreated.on(async () => {
+await client.consumer.userEvents.userCreated.on(async () => {
   // Intentional handler failure: this should be routed to `onError`, not swallowed.
   throw new Error('handler failed');
 }, {
   autocommit: true,
   mode: 'latest'
 });
-await client.producer.events.userCreated.send({
+await client.producer.userEvents.userCreated.send({
   email: 'ada@example.com',
   id: 'user-1',
   isAdmin: true

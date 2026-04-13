@@ -4,8 +4,8 @@ This app lives outside the published library package and shows a real Platformat
 
 1. generate a typed Kafka client from an Avro schema
 2. create a Platformatic runtime with `kafka-typegen/runtime`
-3. produce typed events with the generated producer
-4. consume typed events with the generated consumer
+3. produce typed events with the generated topic-first producer API
+4. consume typed events with the generated topic-first consumer API
 
 ## Run It
 
@@ -28,20 +28,23 @@ pnpm produce
 ## Files
 
 - `kafka-typegen.config.mjs`
-  - demo generator config
+  - demo generator config for `user.events` and `product.events`
 - `schemas/user-created.avsc`
-  - Avro schema used for code generation
+  - Avro schema for `user.created`
 - `schemas/user-deleted.avsc`
-  - second Avro schema used to demonstrate multiple typed events on one topic
+  - Avro schema for `user.deleted`
+- `schemas/product-created.avsc`
+  - Avro schema for `product.created`, including a `timestamp-millis` logical type
 - `src/producer.ts`
-  - example producer using `producer.events.userCreated.send(...)` and `producer.events.userDeleted.send(...)`
+  - example producer using `producer.userEvents.userCreated.send(...)`, `producer.userEvents.userDeleted.send(...)`, and `producer.productEvents.productCreated.send(...)`
 - `src/consumer.ts`
-  - example consumer using `consumer.events.userCreated.on(...)` and `consumer.events.userDeleted.on(...)`
+  - example consumer using `consumer.userEvents.*` and `consumer.productEvents.*`
+- `src/generated/kafka`
+  - generated client checked in for inspection and example stability
 
 ## Notes
 
 - The demo installs `@platformatic/kafka` because real Platformatic usage requires it.
 - The demo uses the `kafka-typegen` CLI and runtime package like a normal consumer project.
 - Producer and consumer lifecycle is user-managed, so the examples call `producer.close()` and `consumer.close()` explicitly.
-
-The generated files are intentionally not committed. They are written to `src/generated/kafka`, which is ignored by git.
+- The generated producer/consumer API is topic-first in the default `minimal` mode, so topic groups like `userEvents` and `productEvents` are the primary entrypoints.

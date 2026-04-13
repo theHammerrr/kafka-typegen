@@ -70,6 +70,26 @@ export function validateSemanticConfig(config: KafkaTypegenConfig): void {
     );
   }
 
+  const configuredExternalTypes = config.generation?.avroExternalTypes;
+  if (configuredExternalTypes !== undefined) {
+    const seenTypeScriptTargets = new Map<string, string>();
+
+    for (const [avroFullName, typeScriptType] of Object.entries(configuredExternalTypes)) {
+      const existingAvroFullName = seenTypeScriptTargets.get(typeScriptType);
+
+      if (existingAvroFullName !== undefined && existingAvroFullName !== avroFullName) {
+        issues.push(
+          buildValidationIssue(
+            ['generation', 'avroExternalTypes'],
+            `TypeScript type '${typeScriptType}' is mapped from both '${existingAvroFullName}' and '${avroFullName}'.`
+          )
+        );
+      } else {
+        seenTypeScriptTargets.set(typeScriptType, avroFullName);
+      }
+    }
+  }
+
   if (issues.length > 0) {
     throw new ConfigValidationError(issues);
   }

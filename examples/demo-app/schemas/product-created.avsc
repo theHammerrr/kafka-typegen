@@ -1,0 +1,10 @@
+{
+    "type": "record",
+    "name": "ProductCreated",
+    "fields": [
+        { "name": "id", "type": "string" },
+        { "name": "name", "type": "string" },
+        { "name": "price", "type": "double" },
+        { "name": "createdAt", "type": "long", "logicalType": "timestamp-millis" }
+    ]
+}

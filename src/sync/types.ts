@@ -3,6 +3,7 @@ import type {
   NormalizedKafkaTypegenConfig,
   SchemaRegistryCompatibility
 } from '../config/index.js';
+import type { KafkaTypegenObservabilityOptions } from '../observability.js';
 
 export type SyncTarget = 'all' | 'kafka' | 'registry';
 export type SyncOperationAction = 'create' | 'drift' | 'noop' | 'update';
@@ -87,3 +88,6 @@ export interface SyncContext {
   readonly config: NormalizedKafkaTypegenConfig;
   readonly options: SyncCliOptions;
 }
+
+export type SyncExecutionOptions = SyncExecutorOptions &
+  KafkaTypegenObservabilityOptions;

@@ -7,13 +7,10 @@ import {
   createPlatformaticRuntimeProducer
 } from 'kafka-typegen/runtime';
 import {
-  EventNames,
   SchemaRegistryConfig,
-  TopicNames,
   createClient,
   createConsumer,
   createProducer,
-  type TopicName,
   type UserCreatedPayload,
   type UserProfiledPayload
 } from './generated/kafka/index.js';
@@ -62,28 +59,15 @@ const userProfiled: UserProfiledPayload = {
   status: 'ACTIVE'
 };
 
-void producer.events.userCreated.send(userCreated, { acks: -1 });
-void client.producer.send(EventNames.UserProfiled, userProfiled);
-const userEventsTopicName = resolveTopicName('user.events');
+void producer.userEvents.userCreated.send(userCreated, { acks: -1 });
+void client.producer.userProfile.userProfiled.send(userProfiled);
 
-void consumer.events.userCreated.on(async (message) => {
+void consumer.userEvents.userCreated.on(async (message) => {
   message.payload.isAdmin;
   message.headers?.['x-kafka-typegen-event'];
 }, { mode: 'latest', autocommit: true });
-void consumer.onTopic(userEventsTopicName, async (message) => {
+void consumer.userEvents.on?.(async (message) => {
   message.topic;
 }, { mode: 'latest', autocommit: false });
 void consumer.close({ force: true });
 void producer.close();
-
-function resolveTopicName(topicSuffix: string): TopicName {
-  const topicName = Object.values(TopicNames).find((candidate) =>
-    candidate.endsWith(`.${topicSuffix}`)
-  );
-
-  if (topicName === undefined) {
-    throw new Error(`Topic name not found for suffix '${topicSuffix}'.`);
-  }
-
-  return topicName as TopicName;
-}

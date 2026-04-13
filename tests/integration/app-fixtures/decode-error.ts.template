@@ -5,11 +5,8 @@ import { Buffer } from 'node:buffer';
 import { Consumer, Producer } from '@platformatic/kafka';
 import { createPlatformaticRuntimeConsumer } from 'kafka-typegen/runtime';
 import {
-  EventNames,
   SchemaRegistryConfig,
-  TopicNames,
-  createConsumer,
-  type TopicName
+  createConsumer
 } from './generated/kafka/index.js';
 
 const producer = new Producer({
@@ -32,9 +29,9 @@ const consumer = createConsumer(createPlatformaticRuntimeConsumer({
   },
   schemaRegistry: SchemaRegistryConfig
 }));
-const userEventsTopicName = resolveTopicName('user.events');
+const userEventsTopicName = 'user.events';
 
-await consumer.events.userCreated.on(async () => {}, {
+await consumer.userEvents.userCreated.on(async () => {}, {
   autocommit: true,
   mode: 'latest'
 });
@@ -46,7 +43,7 @@ await producer.send({
   acks: -1,
   messages: [{
     headers: new Map([
-      [Buffer.from('x-kafka-typegen-event'), Buffer.from(EventNames.UserCreated)]
+      [Buffer.from('x-kafka-typegen-event'), Buffer.from('user.created')]
     ]),
     topic: userEventsTopicName,
     value: invalidPayload
@@ -61,15 +58,3 @@ if (!errorMessage.includes('999999')) {
 console.log('CONSUMER_ERROR:' + errorMessage);
 await producer.close();
 await consumer.close({ force: true });
-
-function resolveTopicName(topicSuffix: string): TopicName {
-  const topicName = Object.values(TopicNames).find((candidate) =>
-    candidate.endsWith(`.${topicSuffix}`)
-  );
-
-  if (topicName === undefined) {
-    throw new Error(`Topic name not found for suffix '${topicSuffix}'.`);
-  }
-
-  return topicName as TopicName;
-}

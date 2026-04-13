@@ -16,10 +16,17 @@ type GeneratedModule = {
   createProducer: (runtimeProducer: {
     send: (metadata: RuntimeEventMetadata, payload: unknown) => Promise<void>;
   }) => {
-    send: (event: string, payload: unknown) => Promise<void>;
-    events: Record<string, { send: (payload: unknown) => Promise<void> }>;
+    userEvents?: {
+      userCreated?: {
+        send: (payload: unknown) => Promise<void>;
+      };
+    };
+    userLifecycle?: {
+      userUpdated?: {
+        send: (payload: unknown) => Promise<void>;
+      };
+    };
   };
-  producerEventMetadata: Record<string, RuntimeEventMetadata>;
 };
 
 async function loadGeneratedModule(configInput: Parameters<typeof resolveConfig>[0]): Promise<GeneratedModule> {
@@ -42,7 +49,7 @@ async function loadGeneratedModule(configInput: Parameters<typeof resolveConfig>
 }
 
 describe('generated producer runtime', () => {
-  it('routes event-first send through producer metadata', async () => {
+  it('routes topic-first producer helpers through event metadata', async () => {
     const generatedModule = await loadGeneratedModule({
       outputDir: './generated',
       sources: {
@@ -68,11 +75,22 @@ describe('generated producer runtime', () => {
       }
     });
 
-    await producer.send('user.created', { email: 'a@example.com', id: '1', isAdmin: true });
+    await producer.userEvents?.userCreated?.send({
+      email: 'a@example.com',
+      id: '1',
+      isAdmin: true
+    });
 
     expect(calls).toEqual([
       {
-        metadata: generatedModule.producerEventMetadata['user.created'],
+        metadata: expect.objectContaining({
+          eventName: 'user.created',
+          payloadTypeName: 'UserCreatedPayload',
+          schemaFilePath: 'user-created.avsc',
+          schemaName: 'UserCreated',
+          subjectName: 'user.events-user.created',
+          topicName: 'user.events'
+        }),
         payload: { email: 'a@example.com', id: '1', isAdmin: true }
       }
     ]);
@@ -113,7 +131,7 @@ describe('generated producer runtime', () => {
       }
     });
 
-    await producer.events['userUpdated']!.send({
+    await producer.userLifecycle?.userUpdated?.send({
       displayName: 'Ada',
       id: '42',
       metadata: { role: 'admin' }

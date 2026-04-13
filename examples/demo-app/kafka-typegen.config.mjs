@@ -37,5 +37,18 @@ export default defineConfig({
         replicationFactor: 1,
       },
     },
+    {
+      name: "product.events",
+      events: [
+        {
+          name: 'product.created',
+          schemaPath: './product-created.avsc',
+        }
+      ],
+      sync: {
+        partitions: 3,
+        replicationFactor: 1,
+      },
+    }
   ],
 });

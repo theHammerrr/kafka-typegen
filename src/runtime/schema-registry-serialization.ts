@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 
+import type { ResolvedKafkaTypegenObservability } from '../observability.js';
 import {
   type CachedSchemaEntry,
   getSchemaById,
@@ -9,6 +10,11 @@ import {
   decodeSchemaRegistryWireFormat,
   encodeSchemaRegistryWireFormat
 } from './schema-registry-wire-format.js';
+import {
+  emitSchemaRegistryFailure,
+  emitSchemaRegistryStart,
+  emitSchemaRegistrySuccess
+} from './schema-registry-observability.js';
 import type {
   RuntimeEventMetadata,
   RuntimeIncomingMessage,
@@ -17,7 +23,8 @@ import type {
 } from './types.js';
 
 export function createSchemaRegistrySerialization(
-  schemaRegistry: SchemaRegistryRuntimeClient
+  schemaRegistry: SchemaRegistryRuntimeClient,
+  observability: ResolvedKafkaTypegenObservability
 ): RuntimeSerializationHooks {
   const schemasById = new Map<number, CachedSchemaEntry>();
   const schemasBySubject = new Map<string, CachedSchemaEntry>();
@@ -27,11 +34,13 @@ export function createSchemaRegistrySerialization(
       metadata: RuntimeEventMetadata,
       message: RuntimeIncomingMessage
     ): Promise<TPayload> {
+      await emitSchemaRegistryStart(observability, metadata, 'deserialize');
       let decodedPayload;
 
       try {
         decodedPayload = decodeSchemaRegistryWireFormat(message.value);
       } catch (error) {
+        await emitSchemaRegistryFailure(observability, metadata, 'deserialize', error);
         throw new Error(
           `Failed to read Schema Registry payload for event '${metadata.eventName}': ${error instanceof Error ? error.message : 'Unknown error.'}`
         );
@@ -44,14 +53,24 @@ export function createSchemaRegistrySerialization(
       );
 
       try {
-        return schema.avroType.fromBuffer(Buffer.from(decodedPayload.payload)) as TPayload;
+        const payload = schema.avroType.fromBuffer(Buffer.from(decodedPayload.payload)) as TPayload;
+        await emitSchemaRegistrySuccess(observability, metadata, 'deserialize', decodedPayload.schemaId);
+        return payload;
       } catch (error) {
+        await emitSchemaRegistryFailure(
+          observability,
+          metadata,
+          'deserialize',
+          error,
+          decodedPayload.schemaId
+        );
         throw new Error(
           `Failed to deserialize event '${metadata.eventName}' with schema id '${decodedPayload.schemaId}': ${error instanceof Error ? error.message : 'Unknown error.'}`
         );
       }
     },
     async serialize(metadata: RuntimeEventMetadata, payload: unknown) {
+      await emitSchemaRegistryStart(observability, metadata, 'serialize');
       const schema = await getSchemaForSubject(
         metadata.subjectName,
         schemaRegistry,
@@ -61,12 +80,14 @@ export function createSchemaRegistrySerialization(
 
       try {
         const encodedPayload = schema.avroType.toBuffer(payload);
+        await emitSchemaRegistrySuccess(observability, metadata, 'serialize', schema.schemaId);
 
         return {
           schemaId: schema.schemaId,
           value: encodeSchemaRegistryWireFormat(schema.schemaId, encodedPayload)
         };
       } catch (error) {
+        await emitSchemaRegistryFailure(observability, metadata, 'serialize', error, schema.schemaId);
         throw new Error(
           `Failed to serialize event '${metadata.eventName}' for subject '${metadata.subjectName}': ${error instanceof Error ? error.message : 'Unknown error.'}`
         );

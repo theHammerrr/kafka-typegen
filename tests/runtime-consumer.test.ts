@@ -25,11 +25,19 @@ type GeneratedConsumerModule = {
       handler: (message: RuntimeConsumerMessage<unknown>) => Promise<void> | void
     ) => Promise<void>;
   }) => {
-    on: (event: string, handler: (message: unknown) => Promise<void> | void) => Promise<void>;
-    onTopic: (topic: string, handler: (message: unknown) => Promise<void> | void) => Promise<void>;
-    events: Record<string, { on: (handler: (message: unknown) => Promise<void> | void) => Promise<void> }>;
+    userEvents?: {
+      on?: (handler: (message: unknown) => Promise<void> | void) => Promise<void>;
+      userCreated?: {
+        on: (handler: (message: unknown) => Promise<void> | void) => Promise<void>;
+      };
+    };
+    userLifecycle?: {
+      on?: (handler: (message: unknown) => Promise<void> | void) => Promise<void>;
+      userUpdated?: {
+        on: (handler: (message: unknown) => Promise<void> | void) => Promise<void>;
+      };
+    };
   };
-  producerEventMetadata: Record<string, RuntimeEventMetadata>;
 };
 
 async function loadGeneratedModule(configInput: Parameters<typeof resolveConfig>[0]): Promise<GeneratedConsumerModule> {
@@ -52,7 +60,7 @@ async function loadGeneratedModule(configInput: Parameters<typeof resolveConfig>
 }
 
 describe('generated consumer runtime', () => {
-  it('routes event-first consumer registration through event metadata', async () => {
+  it('routes topic-first event registration through event metadata', async () => {
     const generatedModule = await loadGeneratedModule({
       outputDir: './generated',
       sources: {
@@ -80,17 +88,20 @@ describe('generated consumer runtime', () => {
     });
 
     const handler = () => undefined;
-    await consumer.on('user.created', handler);
+    await consumer.userEvents?.userCreated?.on(handler);
 
     expect(registrations).toEqual([
       {
         handler,
-        metadata: generatedModule.producerEventMetadata['user.created']
+        metadata: expect.objectContaining({
+          eventName: 'user.created',
+          topicName: 'user.events'
+        })
       }
     ]);
   });
 
-  it('routes topic-based consumer registration by topic name', async () => {
+  it('routes topic-level consumer registration through metadata-by-event', async () => {
     const generatedModule = await loadGeneratedModule({
       outputDir: './generated',
       sources: {
@@ -100,17 +111,12 @@ describe('generated consumer runtime', () => {
         {
           events: [
             {
-              name: 'user.updated',
-              schemaPath: './user-updated.avsc'
-            }
-          ],
-          name: 'user.lifecycle'
-        },
-        {
-          events: [
-            {
               name: 'user.created',
               schemaPath: './user-created.avsc'
+            },
+            {
+              name: 'user.updated',
+              schemaPath: './user-updated.avsc'
             }
           ],
           name: 'user.events'
@@ -136,18 +142,25 @@ describe('generated consumer runtime', () => {
     const eventHandler = () => undefined;
     const topicHandler = () => undefined;
 
-    await consumer.events['userUpdated']!.on(eventHandler);
-    await consumer.onTopic('user.lifecycle', topicHandler);
+    await consumer.userEvents?.userCreated?.on(eventHandler);
+    await consumer.userEvents?.on?.(topicHandler);
 
-    expect(eventRegistrations[0]?.metadata.eventName).toBe('user.updated');
-    expect(eventRegistrations[0]?.metadata.topicName).toBe('user.lifecycle');
+    expect(eventRegistrations[0]?.metadata.eventName).toBe('user.created');
+    expect(eventRegistrations[0]?.metadata.topicName).toBe('user.events');
     expect(topicRegistrations).toEqual([
       {
         handler: topicHandler,
         metadataByEvent: {
-          'user.updated': generatedModule.producerEventMetadata['user.updated']
+          'user.created': expect.objectContaining({
+            eventName: 'user.created',
+            topicName: 'user.events'
+          }),
+          'user.updated': expect.objectContaining({
+            eventName: 'user.updated',
+            topicName: 'user.events'
+          })
         },
-        topicName: 'user.lifecycle'
+        topicName: 'user.events'
       }
     ]);
   });

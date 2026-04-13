@@ -14,9 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   types.
 - Added a dedicated secure Testcontainers suite for Kafka SASL/SCRAM coverage, including authenticated
   `sync --target kafka` and KafkaJS runtime end-to-end tests.
+- Added top-level Avro `enum` and `fixed` root support in schema parsing and type generation.
+- Added `generation.avroExternalTypes` for explicit external named-type mappings during generation.
+- Added `generation.apiMode` with `minimal` as the default and `advanced` as an explicit escape hatch.
+- Added `generation.avroSemanticMode: 'safe'` to render plain Avro `long` values as `bigint`.
 
 ### Changed
 
+- Reworked the default generated API around topic-first producer and consumer helpers such as
+  `producer.userEvents.userCreated.send(...)` and `consumer.userEvents.userCreated.on(...)`.
+- Removed metadata-heavy constants and generic event/topic maps from the default generated public
+  surface; they now remain available only through `generation.apiMode: 'advanced'`.
 - Trimmed `kafka-typegen/runtime` and `kafka-typegen/runtime/platformatic` to the stable high-level
   runtime API. Import transport adapter internals from `kafka-typegen/runtime/advanced`.
 

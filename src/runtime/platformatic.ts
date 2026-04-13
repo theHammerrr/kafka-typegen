@@ -1,3 +1,4 @@
+import { resolveObservability } from '../observability.js';
 import { createRuntimeClient } from './client.js';
 export type {
   RuntimeClient,
@@ -23,7 +24,10 @@ import {
   toPlatformaticRuntimeProducer,
   type PlatformaticRuntimeProducer
 } from './platformatic-producer-client.js';
-export type { PlatformaticConsumerTransportOptions, PlatformaticRuntimeClientOptions } from './platformatic-types.js';
+export type {
+  PlatformaticConsumerTransportOptions,
+  PlatformaticRuntimeClientOptions
+} from './platformatic-types.js';
 import type {
   PlatformaticConsumerLike,
   PlatformaticProducerLike,
@@ -48,14 +52,21 @@ export function createPlatformaticRuntimeClient<
 >(
   options: PlatformaticRuntimeClientOptions<TKey, TProducer, TConsumer>
 ): PlatformaticRuntimeClient<TProducer, TConsumer> {
+  const observability = resolveObservability(options);
   const runtime = createRuntimeClient({
-    consumerTransport: createPlatformaticConsumerTransport(options.consumer, {
-      ...(options.consumeOptions !== undefined
-        ? { consumeOptions: options.consumeOptions }
-        : {}),
-      ...(options.onError !== undefined ? { onError: options.onError } : {})
-    }),
+    consumerTransport: createPlatformaticConsumerTransport(
+      options.consumer,
+      {
+        ...(options.consumeOptions !== undefined
+          ? { consumeOptions: options.consumeOptions }
+          : {}),
+        ...(options.onError !== undefined ? { onError: options.onError } : {})
+      },
+      observability
+    ),
     producerTransport: createPlatformaticProducerTransport(options.producer),
+    ...(options.logger !== undefined ? { logger: options.logger } : {}),
+    ...(options.observer !== undefined ? { observer: options.observer } : {}),
     ...(options.schemaRegistry !== undefined
       ? { schemaRegistry: options.schemaRegistry }
       : { serialization: options.serialization })

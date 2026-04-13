@@ -1,3 +1,4 @@
+import type { ResolvedKafkaTypegenObservability } from '../observability.js';
 import { createConfluentSchemaRegistryRuntimeClient } from './confluent-schema-registry-client.js';
 import { createSchemaRegistrySerialization } from './schema-registry-serialization.js';
 import type {
@@ -21,7 +22,8 @@ function isSchemaRegistryRuntimeClient(
 }
 
 export function resolveRuntimeSerialization(
-  options: RuntimeSerializationOptions
+  options: RuntimeSerializationOptions,
+  observability: ResolvedKafkaTypegenObservability
 ): RuntimeSerializationHooks {
   const hasSchemaRegistry = 'schemaRegistry' in options && options.schemaRegistry !== undefined;
   const hasSerialization = 'serialization' in options && options.serialization !== undefined;
@@ -37,6 +39,7 @@ export function resolveRuntimeSerialization(
     : createSchemaRegistrySerialization(
         isSchemaRegistryRuntimeClient(options.schemaRegistry)
           ? options.schemaRegistry
-          : createConfluentSchemaRegistryRuntimeClient(options.schemaRegistry)
+          : createConfluentSchemaRegistryRuntimeClient(options.schemaRegistry),
+        observability
       );
 }

@@ -1,3 +1,5 @@
+import type { KafkaTypegenObservabilityOptions } from '../observability.js';
+import { resolveObservability } from '../observability.js';
 import { createRuntimeClientProxy } from './client-proxy.js';
 import { createRuntimeConsumer } from './consumer-client.js';
 import { createPlatformaticConsumerTransport } from './platformatic-consumer.js';
@@ -32,7 +34,7 @@ export type PlatformaticRuntimeConsumerOptions<
 > = PlatformaticConsumerTransportOptions<TKey> &
   RuntimeSerializationOptions & {
   readonly consumer: TConsumer;
-};
+} & KafkaTypegenObservabilityOptions;
 
 function isRuntimeEventMetadata(value: unknown): value is RuntimeEventMetadata {
   return (
@@ -53,15 +55,23 @@ export function createPlatformaticRuntimeConsumer<
 >(
   options: PlatformaticRuntimeConsumerOptions<TKey, TConsumer>
 ): PlatformaticRuntimeConsumer<TConsumer> {
+  const observability = resolveObservability(options);
+
   return toPlatformaticRuntimeConsumer<TKey, TConsumer>(
     options.consumer,
     createRuntimeConsumer({
-      consumerTransport: createPlatformaticConsumerTransport(options.consumer, {
-        ...(options.consumeOptions !== undefined
-          ? { consumeOptions: options.consumeOptions }
-          : {}),
-        ...(options.onError !== undefined ? { onError: options.onError } : {})
-      }),
+      consumerTransport: createPlatformaticConsumerTransport(
+        options.consumer,
+        {
+          ...(options.consumeOptions !== undefined
+            ? { consumeOptions: options.consumeOptions }
+            : {}),
+          ...(options.onError !== undefined ? { onError: options.onError } : {})
+        },
+        observability
+      ),
+      ...(options.logger !== undefined ? { logger: options.logger } : {}),
+      ...(options.observer !== undefined ? { observer: options.observer } : {}),
       ...(options.schemaRegistry !== undefined
         ? { schemaRegistry: options.schemaRegistry }
         : { serialization: options.serialization })

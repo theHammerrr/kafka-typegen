@@ -3,11 +3,8 @@
 import { Consumer, Producer } from '@platformatic/kafka';
 import { createPlatformaticRuntimeClient } from 'kafka-typegen/runtime';
 import {
-  EventNames,
   SchemaRegistryConfig,
-  TopicNames,
-  createClient,
-  type TopicName
+  createClient
 } from './generated/kafka/index.js';
 
 const producerClient = new Producer({
@@ -24,8 +21,8 @@ const client = createClient(createPlatformaticRuntimeClient({
   consumer: consumerClient,
   schemaRegistry: SchemaRegistryConfig
 }));
-const userEventsTopicName = resolveTopicName('user.events');
-const userProfileTopicName = resolveTopicName('user.profile');
+const userEventsTopicName = 'user.events';
+const userProfileTopicName = 'user.profile';
 
 const receivedEvents: string[] = [];
 let nextUserEventsOffset = 0n;
@@ -36,12 +33,12 @@ const allMessages = new Promise<void>((resolve, reject) => {
   setTimeout(() => reject(new Error('Timed out waiting for consumed messages.')), 60_000).unref();
 });
 
-await client.consumer.events.userProfiled.on(async (message) => {
+await client.consumer.userProfile.userProfiled.on(async (message) => {
   assertUserProfiledMessage(message);
   receivedEvents.push(message.event);
   maybeResolve();
 }, { autocommit: true, mode: 'latest' });
-await client.consumer.events.userCreated.on(async (message) => {
+await client.consumer.userEvents.userCreated.on(async (message) => {
   assertUserCreatedMessage(message);
   receivedEvents.push(message.event);
   userEventsPartition = message.partition ?? 0;
@@ -56,7 +53,7 @@ await client.consumer.events.userCreated.on(async (message) => {
   });
   maybeResolve();
 }, { autocommit: false, mode: 'latest' });
-await client.consumer.events.userUpdated.on(async (message) => {
+await client.consumer.userEvents.userUpdated.on(async (message) => {
   assertUserUpdatedMessage(message);
   receivedEvents.push(message.event);
   userEventsPartition = message.partition ?? 0;
@@ -72,7 +69,7 @@ await client.consumer.events.userUpdated.on(async (message) => {
   maybeResolve();
 }, { autocommit: false, mode: 'latest' });
 
-await client.producer.events.userProfiled.send({
+await client.producer.userProfile.userProfiled.send({
   balance: null,
   birthDate: 19800,
   id: '550e8400-e29b-41d4-a716-446655440000',
@@ -86,12 +83,12 @@ await client.producer.events.userProfiled.send({
   },
   status: 'ACTIVE'
 }, { acks: -1 });
-await client.producer.events.userCreated.send({
+await client.producer.userEvents.userCreated.send({
   email: 'ada@example.com',
   id: 'user-1',
   isAdmin: true
 }, { acks: -1 });
-await client.producer.events.userUpdated.send({
+await client.producer.userEvents.userUpdated.send({
   displayName: 'Ada',
   id: 'user-1',
   metadata: {
@@ -133,9 +130,9 @@ function assertUserCreatedMessage(message: {
   readonly topic: string;
 }): void {
   if (
-    message.event !== EventNames.UserCreated ||
+    message.event !== 'user.created' ||
     message.topic !== userEventsTopicName ||
-    message.headers?.['x-kafka-typegen-event'] !== EventNames.UserCreated ||
+    message.headers?.['x-kafka-typegen-event'] !== 'user.created' ||
     message.payload.email !== 'ada@example.com' ||
     message.payload.id !== 'user-1' ||
     message.payload.isAdmin !== true
@@ -155,9 +152,9 @@ function assertUserUpdatedMessage(message: {
   readonly topic: string;
 }): void {
   if (
-    message.event !== EventNames.UserUpdated ||
+    message.event !== 'user.updated' ||
     message.topic !== userEventsTopicName ||
-    message.headers?.['x-kafka-typegen-event'] !== EventNames.UserUpdated ||
+    message.headers?.['x-kafka-typegen-event'] !== 'user.updated' ||
     message.payload.displayName !== 'Ada' ||
     message.payload.id !== 'user-1' ||
     message.payload.metadata.role !== 'admin'
@@ -178,9 +175,9 @@ function assertUserProfiledMessage(message: {
   readonly topic: string;
 }): void {
   if (
-    message.event !== EventNames.UserProfiled ||
+    message.event !== 'user.profiled' ||
     message.topic !== userProfileTopicName ||
-    message.headers?.['x-kafka-typegen-event'] !== EventNames.UserProfiled ||
+    message.headers?.['x-kafka-typegen-event'] !== 'user.profiled' ||
     message.payload.birthDate !== 19800 ||
     message.payload.id !== '550e8400-e29b-41d4-a716-446655440000' ||
     message.payload.primaryAddress.street !== 'Main Street' ||
@@ -188,16 +185,4 @@ function assertUserProfiledMessage(message: {
   ) {
     throw new Error('Unexpected user.profiled message: ' + JSON.stringify(message));
   }
-}
-
-function resolveTopicName(topicSuffix: string): TopicName {
-  const topicName = Object.values(TopicNames).find((candidate) =>
-    candidate.endsWith(`.${topicSuffix}`)
-  );
-
-  if (topicName === undefined) {
-    throw new Error(`Topic name not found for suffix '${topicSuffix}'.`);
-  }
-
-  return topicName as TopicName;
 }

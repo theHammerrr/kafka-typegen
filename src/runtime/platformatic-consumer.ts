@@ -1,20 +1,24 @@
 import {
-  buildPlatformaticConsumerOptionsSignature,
-  reportPlatformaticConsumerError
-} from './platformatic-consumer-options.js';
+  emitObservedEvent,
+  type ResolvedKafkaTypegenObservability,
+  toErrorString
+} from '../observability.js';
 import {
   type PlatformaticTopicSubscription,
   closePlatformaticConsumer,
   stopPlatformaticTopicStreams
 } from './platformatic-consumer-lifecycle.js';
-import type { RuntimeIncomingMessage, RuntimeTransportConsumer } from './types.js';
+import {
+  buildPlatformaticConsumerOptionsSignature,
+  reportPlatformaticConsumerError
+} from './platformatic-consumer-options.js';
 import { toRuntimeIncomingMessage } from './platformatic-message.js';
+import type { RuntimeIncomingMessage, RuntimeTransportConsumer } from './types.js';
 import type {
   PlatformaticConsumerLike,
   PlatformaticConsumerSubscribeOptions,
   PlatformaticConsumerTransportOptions,
-  PlatformaticMessage,
-  PlatformaticMessagesStream
+  PlatformaticMessage
 } from './platformatic-types.js';
 
 type PlatformaticTopicHandler = (
@@ -29,7 +33,8 @@ interface PlatformaticTopicSubscriptionState<TKey>
 
 export function createPlatformaticConsumerTransport<TKey = Buffer>(
   consumer: PlatformaticConsumerLike<TKey>,
-  options: PlatformaticConsumerTransportOptions<TKey> = {}
+  options: PlatformaticConsumerTransportOptions<TKey> = {},
+  observability?: ResolvedKafkaTypegenObservability
 ): RuntimeTransportConsumer<PlatformaticConsumerSubscribeOptions<TKey>> {
   const subscriptionsByTopic = new Map<
     string,
@@ -59,7 +64,6 @@ export function createPlatformaticConsumerTransport<TKey = Buffer>(
       }
 
       const topicHandlers = new Set<PlatformaticTopicHandler>([handler]);
-
       const stream = await consumer.consume({
         ...(options.consumeOptions ?? {}),
         ...(subscribeOptions ?? {}),
@@ -75,13 +79,37 @@ export function createPlatformaticConsumerTransport<TKey = Buffer>(
       stream.on('data', (message) => {
         const runtimeMessage = toRuntimeIncomingMessage(message as PlatformaticMessage<TKey>);
         for (const topicHandler of topicHandlers) {
-          void Promise.resolve(topicHandler(runtimeMessage)).catch((error) => {
+          void Promise.resolve(topicHandler(runtimeMessage)).catch(async (error) => {
+            observability?.logger.error('Platformatic topic handler failed.', {
+              error: toErrorString(error),
+              topicName
+            });
+            if (observability !== undefined) {
+              await emitObservedEvent(observability, {
+                error: toErrorString(error),
+                source: 'platformatic-handler',
+                topicName,
+                type: 'runtime.consumer.background-error'
+              });
+            }
             reportPlatformaticConsumerError(error, options.onError);
           });
         }
       });
 
       stream.on('error', (error) => {
+        observability?.logger.error('Platformatic consumer stream error.', {
+          error: toErrorString(error),
+          topicName
+        });
+        if (observability !== undefined) {
+          void emitObservedEvent(observability, {
+            error: toErrorString(error),
+            source: 'platformatic-stream',
+            topicName,
+            type: 'runtime.consumer.background-error'
+          });
+        }
         reportPlatformaticConsumerError(error, options.onError);
       });
     },
