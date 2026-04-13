@@ -7,6 +7,7 @@ import { EventNames, createClient } from './generated/kafka/index.js';
 const kafka = new Kafka({
   brokers: ['{{KAFKA_BROKER}}'],
   clientId: '{{RUN_ID}}-secure-happy-path',
+  ssl: false,
   sasl: {
     mechanism: 'scram-sha-256',
     password: '{{KAFKA_PASSWORD}}',

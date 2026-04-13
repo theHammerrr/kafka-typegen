@@ -19,6 +19,7 @@ import {
 const kafka = new Kafka({
   brokers: ['{{KAFKA_BROKER}}'],
   clientId: '{{RUN_ID}}-secure-typecheck',
+  ssl: false,
   sasl: {
     mechanism: 'scram-sha-256',
     password: '{{KAFKA_PASSWORD}}',
@@ -32,7 +33,7 @@ const consumerClient = kafka.consumer({
 });
 
 const serialization = {
-  async deserialize(_metadata: unknown, message: { readonly value?: Buffer | null }) {
+  async deserialize(_metadata: unknown, message: { readonly value?: Uint8Array | null }) {
     return JSON.parse(new TextDecoder().decode(message.value ?? undefined));
   },
   async serialize(_metadata: unknown, payload: unknown) {
