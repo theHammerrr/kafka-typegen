@@ -26,12 +26,12 @@ const consumer = async () => {
     })
 
     process.once('SIGINT', async () => {
-        await consumer.close(true);
+        await consumer.close({force: true});
         process.exit(0);
     });
 
     process.once('SIGTERM', async () => {
-        await consumer.close(true);
+        await consumer.close({force: true});
         process.exit(0);
     });
 }
