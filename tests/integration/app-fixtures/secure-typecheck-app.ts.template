@@ -7,12 +7,9 @@ import {
   createKafkaJsRuntimeProducer
 } from 'kafka-typegen/runtime/kafkajs';
 import {
-  EventNames,
-  TopicNames,
   createClient,
   createConsumer,
   createProducer,
-  type TopicName,
   type UserCreatedPayload
 } from './generated/kafka/index.js';
 
@@ -65,27 +62,12 @@ const payload: UserCreatedPayload = {
 
 void client.producer.connect();
 void client.consumer.connect();
-void producer.events.userCreated.send(payload, { acks: -1 });
-void client.producer.send(EventNames.UserCreated, payload);
-void consumer.events.userCreated.on(async (message) => {
+void producer.{{USER_EVENTS_PROPERTY}}.userCreated.send(payload, { acks: -1 });
+void client.producer.{{USER_EVENTS_PROPERTY}}.userCreated.send(payload);
+void consumer.{{USER_EVENTS_PROPERTY}}.userCreated.on(async (message) => {
   message.payload.email;
   message.headers?.['x-kafka-typegen-event'];
 }, { fromBeginning: true });
-void consumer.onTopic(resolveTopicName('user.events'), async (message) => {
-  message.event;
-}, { fromBeginning: false });
 void consumer.run();
 void consumer.close();
 void producer.disconnect();
-
-function resolveTopicName(topicSuffix: string): TopicName {
-  const topicName = Object.values(TopicNames).find((candidate) =>
-    candidate.endsWith(`.${topicSuffix}`)
-  );
-
-  if (topicName === undefined) {
-    throw new Error(`Topic name not found for suffix '${topicSuffix}'.`);
-  }
-
-  return topicName as TopicName;
-}

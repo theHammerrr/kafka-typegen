@@ -29,9 +29,9 @@ const consumer = createConsumer(createPlatformaticRuntimeConsumer({
   },
   schemaRegistry: SchemaRegistryConfig
 }));
-const userEventsTopicName = 'user.events';
+const userEventsTopicName = '{{RUN_ID}}.user.events';
 
-await consumer.userEvents.userCreated.on(async () => {}, {
+await consumer.{{USER_EVENTS_PROPERTY}}.userCreated.on(async () => {}, {
   autocommit: true,
   mode: 'latest'
 });

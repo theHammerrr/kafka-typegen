@@ -71,7 +71,11 @@ describe('testcontainers integration', () => {
 
     const result = await runWorkspaceScript(workspace, 'happy-path.js');
 
-    expect(result.exitCode).toBe(0);
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `Generated workspace runtime failed.\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+      );
+    }
     expect(result.stdout).toContain('HAPPY_PATH_OK');
   });
 
@@ -80,7 +84,11 @@ describe('testcontainers integration', () => {
 
     const result = await runWorkspaceScript(workspace, 'invalid-produce.js');
 
-    expect(result.exitCode).toBe(0);
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `Generated workspace runtime failed.\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+      );
+    }
     expect(result.stdout).toContain('SEND_REJECTED:');
   });
 
@@ -89,7 +97,11 @@ describe('testcontainers integration', () => {
 
     const result = await runWorkspaceScript(workspace, 'decode-error.js');
 
-    expect(result.exitCode).toBe(0);
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `Generated workspace runtime failed.\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+      );
+    }
     expect(result.stdout).toContain('CONSUMER_ERROR:');
   });
 
@@ -98,7 +110,11 @@ describe('testcontainers integration', () => {
 
     const result = await runWorkspaceScript(workspace, 'handler-error.js');
 
-    expect(result.exitCode).toBe(0);
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `Generated workspace runtime failed.\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+      );
+    }
     expect(result.stdout).toContain('HANDLER_ERROR:handler failed');
   });
 
@@ -107,7 +123,11 @@ describe('testcontainers integration', () => {
 
     const result = await runWorkspaceScript(workspace, 'standalone-factories.js');
 
-    expect(result.exitCode).toBe(0);
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `Generated workspace runtime failed.\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+      );
+    }
     expect(result.stdout).toContain('STANDALONE_FACTORIES_OK');
   });
 
@@ -116,7 +136,11 @@ describe('testcontainers integration', () => {
 
     const result = await runWorkspaceScript(workspace, 'conflicting-options.js');
 
-    expect(result.exitCode).toBe(0);
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `Generated workspace runtime failed.\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`
+      );
+    }
     expect(result.stdout).toContain('CONFLICT:Topic ');
     expect(result.stdout).toContain(
       "user.events' is already subscribed with different consume options."
@@ -154,11 +178,19 @@ describe('testcontainers integration', () => {
       '--apply'
     ]);
     expect(registryBaselineApply.exitCode).toBe(0);
-    const driftedRegistryWorkspace = await createWorkspace(createConfigText({
-      profileSchemaPath: './user-created.avsc',
-      registryDriftChecks: true,
-      runId: registryRunId
-    }), { runId: registryRunId });
+    const driftedRegistryWorkspace = await createWorkspace(
+      createConfigText({
+        profileSchemaPath: './user-profile-drift.avsc',
+        registryDriftChecks: true,
+        runId: registryRunId
+      }),
+      {
+        appFiles: {
+          '../schemas/user-profile-drift.avsc': createRegistryDriftProfileSchema()
+        },
+        runId: registryRunId
+      }
+    );
     const registryDriftResult = await runCliCommand(driftedRegistryWorkspace, ['sync']);
 
     expect(registryDriftResult.exitCode).toBe(1);
@@ -256,7 +288,11 @@ async function createWorkspace(
   workspaces.push(workspace);
 
   const generateResult = await runCliCommand(workspace, ['generate', '--config', 'kafka-typegen.config.mjs']);
-  expect(generateResult.exitCode).toBe(0);
+  if (generateResult.exitCode !== 0) {
+    throw new Error(
+      `Generated workspace codegen failed.\nstdout:\n${generateResult.stdout}\nstderr:\n${generateResult.stderr}`
+    );
+  }
 
   return workspace;
 }
@@ -308,7 +344,11 @@ async function createSchemaEvolutionWorkspace(
     '--config',
     'kafka-typegen.config.mjs'
   ]);
-  expect(generateResult.exitCode).toBe(0);
+  if (generateResult.exitCode !== 0) {
+    throw new Error(
+      `Generated workspace codegen failed.\nstdout:\n${generateResult.stdout}\nstderr:\n${generateResult.stderr}`
+    );
+  }
 
   return workspace;
 }
@@ -426,6 +466,23 @@ function createCompatibleUserCreatedSchema(): string {
         { default: null, name: 'displayName', type: ['null', 'string'] }
       ],
       name: 'UserCreated',
+      namespace: 'com.example.users',
+      type: 'record'
+    },
+    null,
+    2
+  );
+}
+
+function createRegistryDriftProfileSchema(): string {
+  return JSON.stringify(
+    {
+      fields: [
+        { name: 'id', type: 'string' },
+        { name: 'email', type: 'string' },
+        { name: 'isAdmin', type: 'boolean' }
+      ],
+      name: 'UserProfileDrift',
       namespace: 'com.example.users',
       type: 'record'
     },

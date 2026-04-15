@@ -15,16 +15,16 @@ const consumer = createConsumer(createPlatformaticRuntimeConsumer({
   }),
   schemaRegistry: SchemaRegistryConfig
 }));
-const userEventsTopicName = 'user.events';
+const userEventsTopicName = '{{RUN_ID}}.user.events';
 
-await consumer.userEvents.userCreated.on(async () => {}, {
+await consumer.{{USER_EVENTS_PROPERTY}}.userCreated.on(async () => {}, {
   autocommit: true,
   mode: 'latest'
 });
 
 try {
   // Intentional option conflict: `user.created` already opened this topic stream with autocommit=true.
-  await consumer.userEvents.on?.(async () => {}, {
+  await consumer.{{USER_EVENTS_PROPERTY}}.on?.(async () => {}, {
     autocommit: false,
     mode: 'latest'
   });

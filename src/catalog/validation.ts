@@ -4,6 +4,7 @@ import type { CatalogEvent, CatalogTopic } from './types.js';
 export function validateIdentifierCollisions(events: readonly CatalogEvent[], topics: readonly CatalogTopic[]): void {
   const issues: string[] = [];
   const payloadTypeNames = new Map<string, string>();
+  const topicPropertyNames = new Map<string, string>();
   const topicTypeNames = new Map<string, string>();
 
   for (const event of events) {
@@ -16,6 +17,13 @@ export function validateIdentifierCollisions(events: readonly CatalogEvent[], to
   }
 
   for (const topic of topics) {
+    const existingTopicProperty = topicPropertyNames.get(topic.propertyName);
+    if (existingTopicProperty !== undefined) {
+      issues.push(`Generated topic property '${topic.propertyName}' collides between topics '${existingTopicProperty}' and '${topic.topicName}'.`);
+    } else {
+      topicPropertyNames.set(topic.propertyName, topic.topicName);
+    }
+
     const existingTopic = topicTypeNames.get(topic.topicTypeName);
     if (existingTopic !== undefined) {
       issues.push(`Generated topic type '${topic.topicTypeName}' collides between topics '${existingTopic}' and '${topic.topicName}'.`);

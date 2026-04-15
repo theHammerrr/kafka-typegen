@@ -77,7 +77,11 @@ describe('secure Kafka integration', () => {
     }
 
     const runResult = await runWorkspaceScript(workspace, 'secure-happy-path.js');
-    expect(runResult.exitCode).toBe(0);
+    if (runResult.exitCode !== 0) {
+      throw new Error(
+        `Secure generated workspace runtime failed.\nstdout:\n${runResult.stdout}\nstderr:\n${runResult.stderr}`
+      );
+    }
     expect(runResult.stdout).toContain('SECURE_HAPPY_PATH_OK');
   });
 

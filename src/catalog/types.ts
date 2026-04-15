@@ -22,6 +22,7 @@ export interface CatalogEvent {
 export interface CatalogTopic {
   readonly eventNames: readonly string[];
   readonly events: readonly CatalogEvent[];
+  readonly propertyName: string;
   readonly subjectStrategy: string;
   readonly topicName: string;
   readonly topicTypeName: string;

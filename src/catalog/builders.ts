@@ -2,7 +2,7 @@ import type { NormalizedKafkaTypegenConfig, NormalizedTopicConfig } from '../con
 import type { EventSchemaDefinition } from '../schema/index.js';
 
 import { CatalogValidationError } from './errors.js';
-import { buildPayloadTypeName, buildTopicTypeName } from './naming.js';
+import { buildPayloadTypeName, buildTopicPropertyName, buildTopicTypeName } from './naming.js';
 import type { CatalogEvent, CatalogTopic } from './types.js';
 
 export function buildCatalogEvents(
@@ -63,6 +63,7 @@ export function buildCatalogTopics(
     return {
       eventNames: topicEvents.map((event) => event.eventName),
       events: topicEvents,
+      propertyName: buildTopicPropertyName(topic.topicName),
       subjectStrategy: topic.subjectStrategy,
       topicName: topic.topicName,
       topicTypeName: buildTopicTypeName(topic.topicName, config.naming.topicTypeSuffix)

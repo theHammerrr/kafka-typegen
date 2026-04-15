@@ -9,10 +9,22 @@ export function toPascalCase(value: string): string {
     .join('');
 }
 
+export function toCamelCase(value: string): string {
+  const pascalCaseValue = toPascalCase(value);
+
+  return pascalCaseValue.length > 0
+    ? `${pascalCaseValue.charAt(0).toLowerCase()}${pascalCaseValue.slice(1)}`
+    : 'topic';
+}
+
 export function buildPayloadTypeName(eventName: string, suffix: string): string {
   return `${toPascalCase(eventName)}${suffix}`;
 }
 
 export function buildTopicTypeName(topicName: string, suffix: string): string {
   return `${toPascalCase(topicName)}${suffix}`;
+}
+
+export function buildTopicPropertyName(topicName: string): string {
+  return toCamelCase(topicName);
 }

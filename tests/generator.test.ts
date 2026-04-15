@@ -124,6 +124,62 @@ describe('type generation', () => {
     ].join('\n'));
   });
 
+  it('derives minimal topic properties from the full topic name when names are prefixed', async () => {
+    const output = await buildGeneratedOutput({
+      outputDir: './generated',
+      sources: {
+        rootDir: schemaFixturesDir
+      },
+      topics: [
+        {
+          events: [
+            {
+              name: 'user.created',
+              schemaPath: './user-created.avsc'
+            }
+          ],
+          name: 'ktg-run-123.user.events'
+        }
+      ]
+    });
+    const contents = output.files.find((file) => file.filePath === 'kafka-client.ts')?.contents ?? '';
+
+    expect(contents).toContain('ktgRun123UserEvents: GeneratedKtgRun123UserEventsProducerTopic<TRuntimeProducer>;');
+    expect(contents).toContain('producerMetadataByTopic.ktgRun123UserEvents.userCreated');
+    expect(contents).toContain("topicName: 'ktg-run-123.user.events'");
+  });
+
+  it('fails loudly when full topic names sanitize to the same generated property', async () => {
+    await expect(
+      buildGeneratedOutput({
+        outputDir: './generated',
+        sources: {
+          rootDir: schemaFixturesDir
+        },
+        topics: [
+          {
+            events: [
+              {
+                name: 'user.created',
+                schemaPath: './user-created.avsc'
+              }
+            ],
+            name: 'tenant-a.user.events'
+          },
+          {
+            events: [
+              {
+                name: 'user.updated',
+                schemaPath: './user-updated.avsc'
+              }
+            ],
+            name: 'tenant_a.user.events'
+          }
+        ]
+      })
+    ).rejects.toThrow(/Generated topic property 'tenantAUserEvents' collides between topics 'tenant[_-]a\.user\.events' and 'tenant[-_]a\.user\.events'\./);
+  });
+
   it('supports the legacy advanced generated surface when explicitly requested', async () => {
     const output = await buildGeneratedOutput({
       generation: {

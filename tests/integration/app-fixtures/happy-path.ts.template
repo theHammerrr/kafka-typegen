@@ -21,8 +21,8 @@ const client = createClient(createPlatformaticRuntimeClient({
   consumer: consumerClient,
   schemaRegistry: SchemaRegistryConfig
 }));
-const userEventsTopicName = 'user.events';
-const userProfileTopicName = 'user.profile';
+const userEventsTopicName = '{{RUN_ID}}.user.events';
+const userProfileTopicName = '{{RUN_ID}}.user.profile';
 
 const receivedEvents: string[] = [];
 let nextUserEventsOffset = 0n;
@@ -33,12 +33,12 @@ const allMessages = new Promise<void>((resolve, reject) => {
   setTimeout(() => reject(new Error('Timed out waiting for consumed messages.')), 60_000).unref();
 });
 
-await client.consumer.userProfile.userProfiled.on(async (message) => {
+await client.consumer.{{USER_PROFILE_PROPERTY}}.userProfiled.on(async (message) => {
   assertUserProfiledMessage(message);
   receivedEvents.push(message.event);
   maybeResolve();
 }, { autocommit: true, mode: 'latest' });
-await client.consumer.userEvents.userCreated.on(async (message) => {
+await client.consumer.{{USER_EVENTS_PROPERTY}}.userCreated.on(async (message) => {
   assertUserCreatedMessage(message);
   receivedEvents.push(message.event);
   userEventsPartition = message.partition ?? 0;
@@ -53,7 +53,7 @@ await client.consumer.userEvents.userCreated.on(async (message) => {
   });
   maybeResolve();
 }, { autocommit: false, mode: 'latest' });
-await client.consumer.userEvents.userUpdated.on(async (message) => {
+await client.consumer.{{USER_EVENTS_PROPERTY}}.userUpdated.on(async (message) => {
   assertUserUpdatedMessage(message);
   receivedEvents.push(message.event);
   userEventsPartition = message.partition ?? 0;
@@ -69,7 +69,7 @@ await client.consumer.userEvents.userUpdated.on(async (message) => {
   maybeResolve();
 }, { autocommit: false, mode: 'latest' });
 
-await client.producer.userProfile.userProfiled.send({
+await client.producer.{{USER_PROFILE_PROPERTY}}.userProfiled.send({
   balance: null,
   birthDate: 19800,
   id: '550e8400-e29b-41d4-a716-446655440000',
@@ -83,12 +83,12 @@ await client.producer.userProfile.userProfiled.send({
   },
   status: 'ACTIVE'
 }, { acks: -1 });
-await client.producer.userEvents.userCreated.send({
+await client.producer.{{USER_EVENTS_PROPERTY}}.userCreated.send({
   email: 'ada@example.com',
   id: 'user-1',
   isAdmin: true
 }, { acks: -1 });
-await client.producer.userEvents.userUpdated.send({
+await client.producer.{{USER_EVENTS_PROPERTY}}.userUpdated.send({
   displayName: 'Ada',
   id: 'user-1',
   metadata: {

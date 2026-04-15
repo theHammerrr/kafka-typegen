@@ -39,10 +39,10 @@ const receivedMessage = new Promise<void>((resolve, reject) => {
   setTimeout(() => reject(new Error('Timed out waiting for standalone consumer message.')), 60_000).unref();
 });
 
-await consumer.userEvents.userCreated.on(async (message) => {
+await consumer.{{USER_EVENTS_PROPERTY}}.userCreated.on(async (message) => {
   if (
     message.event !== 'user.created' ||
-    message.topic !== 'user.events' ||
+    message.topic !== '{{RUN_ID}}.user.events' ||
     message.payload.email !== 'standalone@example.com' ||
     message.payload.id !== 'standalone-user' ||
     message.payload.isAdmin !== false
@@ -53,7 +53,7 @@ await consumer.userEvents.userCreated.on(async (message) => {
   resolveMessage?.();
 }, { autocommit: true, mode: 'latest' });
 
-await producer.userEvents.userCreated.send({
+await producer.{{USER_EVENTS_PROPERTY}}.userCreated.send({
   email: 'standalone@example.com',
   id: 'standalone-user',
   isAdmin: false

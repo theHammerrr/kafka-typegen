@@ -1,8 +1,8 @@
 // End-to-end secure fixture: validates authenticated KafkaJS produce/consume,
-// decoded payload contents, generated event names, and native shutdown methods.
+// decoded payload contents, generated minimal API access paths, and native shutdown methods.
 import { Kafka } from 'kafkajs';
 import { createKafkaJsRuntimeClient } from 'kafka-typegen/runtime/kafkajs';
-import { EventNames, createClient } from './generated/kafka/index.js';
+import { createClient } from './generated/kafka/index.js';
 
 const kafka = new Kafka({
   brokers: ['{{KAFKA_BROKER}}'],
@@ -44,10 +44,10 @@ const received = new Promise<void>((resolve, reject) => {
   setTimeout(() => reject(new Error('Timed out waiting for secure Kafka message.')), 60_000).unref();
 });
 
-await client.consumer.events.userCreated.on(async (message) => {
+await client.consumer.{{USER_EVENTS_PROPERTY}}.userCreated.on(async (message) => {
   if (
-    message.event !== EventNames.UserCreated ||
-    message.headers?.['x-kafka-typegen-event'] !== EventNames.UserCreated ||
+    message.event !== 'user.created' ||
+    message.headers?.['x-kafka-typegen-event'] !== 'user.created' ||
     message.payload.email !== 'ada@example.com' ||
     message.payload.id !== 'user-1' ||
     message.payload.isAdmin !== true
@@ -60,8 +60,8 @@ await client.consumer.events.userCreated.on(async (message) => {
   fromBeginning: true
 });
 
-await client.consumer.run();
-await client.producer.events.userCreated.send({
+void client.consumer.run();
+await client.producer.{{USER_EVENTS_PROPERTY}}.userCreated.send({
   email: 'ada@example.com',
   id: 'user-1',
   isAdmin: true

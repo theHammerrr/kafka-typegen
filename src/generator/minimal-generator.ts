@@ -71,7 +71,7 @@ function emitProducerTopicInterface(topic: CatalogTopic): string {
 function emitProducerTypes(catalog: EventCatalog): string {
   const topicInterfaces = catalog.topics.map(emitProducerTopicInterface);
   const topicMembers = catalog.topics.map((topic) => {
-    const propertyName = toCamelCase(topic.topicName);
+    const propertyName = topic.propertyName;
     return `${propertyName}: ${getProducerTopicInterfaceName(topic)}<TRuntimeProducer>;`;
   });
 
@@ -103,7 +103,7 @@ function emitProducerMetadata(catalog: EventCatalog, topic: CatalogTopic): strin
     return `${propertyName}: {\n${indent(lines.join('\n'))}\n}`;
   });
 
-  return `${toCamelCase(topic.topicName)}: {\n${indent(eventEntries.join(',\n'))}\n}`;
+  return `${topic.propertyName}: {\n${indent(eventEntries.join(',\n'))}\n}`;
 }
 
 function emitMinimalProducerMetadata(catalog: EventCatalog): string {
@@ -117,10 +117,10 @@ function emitMinimalProducerMetadata(catalog: EventCatalog): string {
 function emitConsumerTopicMetadata(topic: CatalogTopic): string {
   const eventEntries = topic.events.map((event) => {
     const propertyName = toCamelCase(event.eventName);
-    return `${formatLiteral(event.eventName)}: producerMetadataByTopic.${toCamelCase(topic.topicName)}.${propertyName}`;
+    return `${formatLiteral(event.eventName)}: producerMetadataByTopic.${topic.propertyName}.${propertyName}`;
   });
 
-  return `${toCamelCase(topic.topicName)}: {\n${indent(
+  return `${topic.propertyName}: {\n${indent(
     [
       `topicName: ${formatLiteral(topic.topicName)},`,
       'metadataByEvent: {',
@@ -140,7 +140,7 @@ function emitMinimalConsumerMetadata(catalog: EventCatalog): string {
 
 function emitProducerFactory(catalog: EventCatalog): string {
   const topicEntries = catalog.topics.map((topic) => {
-    const topicPropertyName = toCamelCase(topic.topicName);
+    const topicPropertyName = topic.propertyName;
     const eventEntries = topic.events.map((event) => {
       const eventPropertyName = toCamelCase(event.eventName);
       const body = [
@@ -190,7 +190,7 @@ function emitConsumerTopicInterface(topic: CatalogTopic): string {
 function emitConsumerTypes(catalog: EventCatalog): string {
   const topicInterfaces = catalog.topics.map(emitConsumerTopicInterface);
   const topicMembers = catalog.topics.map((topic) => {
-    const propertyName = toCamelCase(topic.topicName);
+    const propertyName = topic.propertyName;
     return `${propertyName}: ${getConsumerTopicInterfaceName(topic)}<TRuntimeConsumer>;`;
   });
 
@@ -209,7 +209,7 @@ function emitConsumerTypes(catalog: EventCatalog): string {
 
 function emitConsumerFactory(catalog: EventCatalog): string {
   const topicEntries = catalog.topics.map((topic) => {
-    const topicPropertyName = toCamelCase(topic.topicName);
+    const topicPropertyName = topic.propertyName;
     const members: string[] = [];
 
     if (topic.events.length > 1) {

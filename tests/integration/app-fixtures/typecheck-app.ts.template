@@ -59,14 +59,14 @@ const userProfiled: UserProfiledPayload = {
   status: 'ACTIVE'
 };
 
-void producer.userEvents.userCreated.send(userCreated, { acks: -1 });
-void client.producer.userProfile.userProfiled.send(userProfiled);
+void producer.{{USER_EVENTS_PROPERTY}}.userCreated.send(userCreated, { acks: -1 });
+void client.producer.{{USER_PROFILE_PROPERTY}}.userProfiled.send(userProfiled);
 
-void consumer.userEvents.userCreated.on(async (message) => {
+void consumer.{{USER_EVENTS_PROPERTY}}.userCreated.on(async (message) => {
   message.payload.isAdmin;
   message.headers?.['x-kafka-typegen-event'];
 }, { mode: 'latest', autocommit: true });
-void consumer.userEvents.on?.(async (message) => {
+void consumer.{{USER_EVENTS_PROPERTY}}.on?.(async (message) => {
   message.topic;
 }, { mode: 'latest', autocommit: false });
 void consumer.close({ force: true });
