@@ -1,6 +1,6 @@
 {
   "name": "kafka-typegen",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "Type-safe Kafka client generation from topic definitions and Avro schemas.",
   "license": "MIT",
   "repository": {
@@ -62,6 +62,7 @@
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:integration:secure": "vitest run --config vitest.integration.secure.config.ts",
+    "test:performance": "vitest run tests/performance.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "clean": "powershell -Command \"if (Test-Path dist) { Remove-Item -Recurse -Force dist }\""

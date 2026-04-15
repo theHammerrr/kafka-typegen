@@ -21,7 +21,9 @@ import {
 } from '../src/index.js';
 
 describe('public entrypoint', () => {
-  it('exposes the config helpers', () => {
+  it('exposes the config helpers', async () => {
+    const rootModule = await import('../src/index.js');
+
     expect(createCatalogBuilder).toBeTypeOf('function');
     expect(createRuntimeConsumer).toBeTypeOf('function');
     expect(createRuntimeClient).toBeTypeOf('function');
@@ -32,6 +34,11 @@ describe('public entrypoint', () => {
     expect(executeSync).toBeTypeOf('function');
     expect(resolveConfig).toBeTypeOf('function');
     expect(validateConfig).toBeTypeOf('function');
+    expect('createKafkaJsProducerTransport' in rootModule).toBe(false);
+    expect('createKafkaJsConsumerTransport' in rootModule).toBe(false);
+    expect('createPlatformaticProducerTransport' in rootModule).toBe(false);
+    expect('createPlatformaticConsumerTransport' in rootModule).toBe(false);
+    expect('createSchemaRegistrySerialization' in rootModule).toBe(false);
   });
 
   it('exposes Step 2 config-oriented types alongside architecture contracts', () => {
@@ -76,6 +83,7 @@ describe('public entrypoint', () => {
 
   it('ships runtime subpath exports for generic and platformatic runtimes', async () => {
     const runtimeModule = await import('../src/runtime/index.js');
+    const rootModule = await import('../src/index.js');
     const advancedRuntimeModule = await import('../src/runtime/advanced.js');
     const kafkaJsRuntimeModule = await import('../src/runtime/kafkajs.js');
     const platformaticRuntimeModule = await import('../src/runtime/platformatic.js');
@@ -93,6 +101,8 @@ describe('public entrypoint', () => {
     expect(runtimeModule.createPlatformaticRuntimeClient).toBeTypeOf('function');
     expect(runtimeModule.createPlatformaticRuntimeProducer).toBeTypeOf('function');
     expect(runtimeModule.createPlatformaticRuntimeConsumer).toBeTypeOf('function');
+    expect(rootModule.createKafkaJsRuntimeClient).toBeTypeOf('function');
+    expect(rootModule.createPlatformaticRuntimeClient).toBeTypeOf('function');
     expect(advancedRuntimeModule.createKafkaJsProducerTransport).toBeTypeOf('function');
     expect(advancedRuntimeModule.createKafkaJsConsumerTransport).toBeTypeOf('function');
     expect(platformaticRuntimeModule.createPlatformaticRuntimeClient).toBeTypeOf('function');
@@ -107,6 +117,11 @@ describe('public entrypoint', () => {
     expect('createPlatformaticProducerTransport' in runtimeModule).toBe(false);
     expect('createPlatformaticConsumerTransport' in runtimeModule).toBe(false);
     expect('createSchemaRegistrySerialization' in runtimeModule).toBe(false);
+    expect('createKafkaJsProducerTransport' in rootModule).toBe(false);
+    expect('createKafkaJsConsumerTransport' in rootModule).toBe(false);
+    expect('createPlatformaticProducerTransport' in rootModule).toBe(false);
+    expect('createPlatformaticConsumerTransport' in rootModule).toBe(false);
+    expect('createSchemaRegistrySerialization' in rootModule).toBe(false);
     expect('createPlatformaticProducerTransport' in platformaticRuntimeModule).toBe(false);
     expect('createPlatformaticConsumerTransport' in platformaticRuntimeModule).toBe(false);
     expect(packageJson.exports['./runtime']).toBeDefined();

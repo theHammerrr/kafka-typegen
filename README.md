@@ -12,6 +12,19 @@ The goal is to make Kafka event contracts feel like a real application API inste
 
 It supports both single-event and multi-event topics.
 
+## Stability
+
+`kafka-typegen` `1.0.0` defines its stable surface in [docs/stability-policy.md](./docs/stability-policy.md).
+
+For `1.0.0`, the main compatibility targets are:
+
+- the validated config shape and current defaults
+- the default generated `minimal` API built around `createProducer(...)`, `createConsumer(...)`, and `createClient(...)`
+- the documented runtime entrypoints under `kafka-typegen/runtime*`
+- the documented CLI and sync behavior
+
+Areas that are still intentionally limited are called out explicitly in the stability policy, especially low-level internals and full TLS certificate-wiring support.
+
 ## What It Generates
 
 Given a config like:
@@ -128,18 +141,27 @@ pnpm add kafka-typegen @platformatic/kafka
 
 ## Release Pipeline
 
-The repository includes `.github/workflows/publish.yml`, which runs on every push to `main` and:
+The repository includes `.github/workflows/publish.yml`, which runs on pushes to version tags like `v1.0.0` and:
 
 - installs dependencies
 - runs `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build`
-- rewrites the package version to a unique canary version like `0.1.0-main.<run>.<sha>`
-- publishes that build to npm with the `main` dist-tag
+- verifies that the pushed Git tag matches `package.json`
+- publishes that exact package version to npm
 
-This is intentionally a canary flow rather than a stable `latest` release flow. npm will not accept re-publishing the same version for every commit, so each `main` push must publish a unique prerelease version.
+Stable releases are therefore tag-driven rather than canary-on-main. To publish a release:
+
+1. update `package.json` and `CHANGELOG.md`
+2. commit the release
+3. create and push a matching tag such as `v1.0.0`
 
 To enable publishing, set the `NPM_TOKEN` GitHub Actions secret for the repository.
 
 See `CHANGELOG.md` for release history.
+
+For release discipline and upgrade planning, see:
+
+- [docs/release-checklist.md](./docs/release-checklist.md)
+- [docs/upgrade-guide-1.0.0.md](./docs/upgrade-guide-1.0.0.md)
 
 ## Quick Start
 
@@ -990,4 +1012,4 @@ What it does not do automatically:
 
 ## Status
 
-This repository is building toward a Prisma-style developer experience for Kafka event contracts. The current implementation already supports end-to-end generation and runtime integration, but the public API should still be treated as early-stage.
+This repository is now on the stable `1.x` line. The compatibility guarantees for that line are documented in [docs/stability-policy.md](./docs/stability-policy.md).

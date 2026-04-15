@@ -10,6 +10,7 @@ export type IntegrationAppFixtureName =
   | 'invalid-produce.ts'
   | 'secure-happy-path.ts'
   | 'secure-typecheck-app.ts'
+  | 'standalone-factories.ts'
   | 'typecheck-app.ts';
 
 export interface IntegrationAppTemplateValues {

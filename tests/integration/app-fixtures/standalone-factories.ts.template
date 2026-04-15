@@ -1,0 +1,66 @@
+// Standalone factory happy path: exercises producer-only and consumer-only
+// generated APIs without going through createClient(...).
+import { Consumer, Producer } from '@platformatic/kafka';
+import {
+  createPlatformaticRuntimeConsumer,
+  createPlatformaticRuntimeProducer
+} from 'kafka-typegen/runtime';
+import {
+  SchemaRegistryConfig,
+  createConsumer,
+  createProducer
+} from './generated/kafka/index.js';
+
+const producerClient = new Producer({
+  bootstrapBrokers: ['{{KAFKA_BROKER}}'],
+  clientId: '{{RUN_ID}}-standalone-producer'
+});
+const consumerClient = new Consumer({
+  bootstrapBrokers: ['{{KAFKA_BROKER}}'],
+  clientId: '{{RUN_ID}}-standalone-consumer',
+  groupId: '{{RUN_ID}}-standalone-consumer-group'
+});
+
+const producer = createProducer(createPlatformaticRuntimeProducer({
+  producer: producerClient,
+  schemaRegistry: SchemaRegistryConfig
+}));
+const consumer = createConsumer(createPlatformaticRuntimeConsumer({
+  consumer: consumerClient,
+  onError(error) {
+    console.error('STANDALONE_CONSUMER_ERROR:' + (error instanceof Error ? error.message : String(error)));
+  },
+  schemaRegistry: SchemaRegistryConfig
+}));
+
+let resolveMessage: (() => void) | undefined;
+const receivedMessage = new Promise<void>((resolve, reject) => {
+  resolveMessage = resolve;
+  setTimeout(() => reject(new Error('Timed out waiting for standalone consumer message.')), 60_000).unref();
+});
+
+await consumer.userEvents.userCreated.on(async (message) => {
+  if (
+    message.event !== 'user.created' ||
+    message.topic !== 'user.events' ||
+    message.payload.email !== 'standalone@example.com' ||
+    message.payload.id !== 'standalone-user' ||
+    message.payload.isAdmin !== false
+  ) {
+    throw new Error('Unexpected standalone user.created message: ' + JSON.stringify(message));
+  }
+
+  resolveMessage?.();
+}, { autocommit: true, mode: 'latest' });
+
+await producer.userEvents.userCreated.send({
+  email: 'standalone@example.com',
+  id: 'standalone-user',
+  isAdmin: false
+}, { acks: -1 });
+
+await receivedMessage;
+
+await consumer.close({ force: true });
+await producer.close();
+console.log('STANDALONE_FACTORIES_OK');

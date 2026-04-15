@@ -349,10 +349,39 @@ describe('config validation', () => {
         ]
       })
     ).toThrowError(ConfigValidationError);
+
+    try {
+      validateConfig({
+        generation: {
+          packageName: '@acme/generated-kafka'
+        },
+        outputDir: './generated',
+        topics: [
+          {
+            events: [
+              {
+                name: 'user.created',
+                schemaPath: './schemas/user-created.avsc'
+              }
+            ],
+            name: 'user.events'
+          }
+        ]
+      });
+    } catch (error) {
+      const validationError = error as ConfigValidationError;
+
+      expect(validationError.issues).toEqual([
+        {
+          message: 'Unrecognized key: "packageName"',
+          path: 'generation'
+        }
+      ]);
+    }
   });
 
   it('rejects Avro external type mappings that reuse the same TypeScript type expression', () => {
-    expect(() =>
+    try {
       validateConfig({
         generation: {
           avroExternalTypes: {
@@ -372,8 +401,20 @@ describe('config validation', () => {
             name: 'user.events'
           }
         ]
-      })
-    ).toThrowError(ConfigValidationError);
+      });
+    } catch (error) {
+      const validationError = error as ConfigValidationError;
+
+      expect(validationError.issues).toEqual([
+        {
+          message: "TypeScript type 'import('./types.js').SharedAddress' is mapped from both 'com.external.Address' and 'com.external.BillingAddress'.",
+          path: 'generation.avroExternalTypes'
+        }
+      ]);
+      return;
+    }
+
+    throw new Error('Expected validation to fail for duplicate external type mappings.');
   });
 
   it('requires topic sync config for every topic when kafka sync is enabled', () => {

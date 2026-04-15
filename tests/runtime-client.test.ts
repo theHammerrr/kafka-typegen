@@ -346,11 +346,11 @@ describe('runtime client integration', () => {
 
     const producer = generatedModule.createProducer(runtimeProducer);
 
-    await producer.userEvents.userCreated.send({ id: '7' });
+    await producer.userEvents!.userCreated.send({ id: '7' });
 
     const receivedMessages: unknown[] = [];
     const consumer = generatedModule.createConsumer(runtimeConsumer);
-    await consumer.userEvents.userCreated.on(async (message) => {
+    await consumer.userEvents!.userCreated.on(async (message) => {
       receivedMessages.push(message);
     });
 
@@ -426,12 +426,12 @@ describe('runtime client integration', () => {
     });
 
     const producer = generatedModule.createProducer(runtimeProducer);
-    await producer.userEvents.userCreated.send({ id: '11' }, { acks: -1 });
-    await producer.userEvents.userCreated.send({ id: '12' }, { acks: 1 });
+    await producer.userEvents!.userCreated.send({ id: '11' }, { acks: -1 });
+    await producer.userEvents!.userCreated.send({ id: '12' }, { acks: 1 });
 
     const consumer = generatedModule.createConsumer(runtimeConsumer);
-    await consumer.userEvents.userCreated.on(async () => {}, { autocommit: false });
-    await consumer.userEvents.userCreated.on(async () => {}, { autocommit: true });
+    await consumer.userEvents!.userCreated.on(async () => {}, { autocommit: false });
+    await consumer.userEvents!.userCreated.on(async () => {}, { autocommit: true });
 
     expect(sentOptions).toEqual([{ acks: -1 }, { acks: 1 }]);
     expect(subscribeOptions).toEqual([

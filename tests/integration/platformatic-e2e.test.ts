@@ -102,6 +102,15 @@ describe('testcontainers integration', () => {
     expect(result.stdout).toContain('HANDLER_ERROR:handler failed');
   });
 
+  it('supports standalone producer-only and consumer-only generated factories', async () => {
+    const workspace = await createBuiltWorkspace(['standalone-factories.ts']);
+
+    const result = await runWorkspaceScript(workspace, 'standalone-factories.js');
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('STANDALONE_FACTORIES_OK');
+  });
+
   it('fails deterministically for conflicting repeated topic subscriptions', async () => {
     const workspace = await createBuiltWorkspace(['conflicting-options.ts']);
 

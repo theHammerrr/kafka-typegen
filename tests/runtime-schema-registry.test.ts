@@ -375,6 +375,65 @@ describe('runtime schema registry support', () => {
     }
   });
 
+  it('surfaces runtime schema registry HTTP failures with resource-specific context', async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          error_code: 40101,
+          message: 'Unauthorized'
+        }),
+        {
+          headers: { 'Content-Type': 'application/json' },
+          status: 401,
+          statusText: 'Unauthorized'
+        }
+      )
+    );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const registry = createConfluentSchemaRegistryRuntimeClient({
+        auth: {
+          token: 'secret-token'
+        },
+        url: 'http://localhost:8081'
+      });
+
+      await expect(
+        registry.getLatestSchema('user.events-user.created')
+      ).rejects.toThrowError(
+        "Schema Registry request for subject 'user.events-user.created' failed with 401 Unauthorized."
+      );
+
+      await expect(registry.getSchemaById(7)).rejects.toThrowError(
+        "Schema Registry request for schema id '7' failed with 401 Unauthorized."
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('bubbles runtime schema registry network failures from fetch', async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error('connect ECONNREFUSED 127.0.0.1:8081');
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const registry = createConfluentSchemaRegistryRuntimeClient({
+        url: 'http://localhost:8081'
+      });
+
+      await expect(
+        registry.getLatestSchema('user.events-user.created')
+      ).rejects.toThrowError('connect ECONNREFUSED 127.0.0.1:8081');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('rejects ambiguous or missing runtime serialization configuration', async () => {
     const { registry } = createSchemaRegistryMock();
     const serialization: RuntimeSerializationHooks = {

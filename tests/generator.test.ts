@@ -46,6 +46,41 @@ describe('type generation', () => {
     expect(contents).not.toContain('export const TopicNames = {');
     expect(contents).not.toContain('export interface EventPayloadByName {');
     expect(contents).not.toContain('export const producerEventMetadata');
+    expect(contents).toContain([
+      'export interface GeneratedUserEventsProducerTopic<TRuntimeProducer extends RuntimeProducer = RuntimeProducer> {',
+      '  userCreated: {',
+      '    send(payload: UserCreatedPayload, options?: GeneratedProducerSendOptions<TRuntimeProducer>): Promise<void>;',
+      '  };',
+      '}',
+      '',
+      'export interface GeneratedProducerTopics<TRuntimeProducer extends RuntimeProducer = RuntimeProducer> {',
+      '  userEvents: GeneratedUserEventsProducerTopic<TRuntimeProducer>;',
+      '}',
+      '',
+      'export type GeneratedProducer<TRuntimeProducer extends RuntimeProducer = RuntimeProducer> = TRuntimeProducer & GeneratedProducerTopics<TRuntimeProducer>;',
+      '',
+      'export function createProducer<TRuntimeProducer extends RuntimeProducer>(runtimeProducer: TRuntimeProducer): GeneratedProducer<TRuntimeProducer> {',
+      '  const runtimeSend = runtimeProducer.send.bind(runtimeProducer);',
+      '',
+      '  return Object.assign(Object.create(runtimeProducer), {',
+      '    userEvents: {',
+      '      userCreated: {',
+      '        send(payload: UserCreatedPayload, options?: GeneratedProducerSendOptions<TRuntimeProducer>) {',
+      '          return runtimeSend(producerMetadataByTopic.userEvents.userCreated, payload, options);',
+      '        }',
+      '      }',
+      '    }',
+      '  }) as GeneratedProducer<TRuntimeProducer>;',
+      '}'
+    ].join('\n'));
+    expect(contents).toContain([
+      'export function createClient<TRuntimeClient extends RuntimeClient>(runtime: TRuntimeClient): GeneratedClient<TRuntimeClient> {',
+      '  return Object.assign(Object.create(runtime), {',
+      '    producer: createProducer(runtime.producer),',
+      '    consumer: createConsumer(runtime.consumer)',
+      '  }) as GeneratedClient<TRuntimeClient>;',
+      '}'
+    ].join('\n'));
   });
 
   it('emits topic-level subscriptions only when a topic has multiple events', async () => {
@@ -76,6 +111,17 @@ describe('type generation', () => {
     expect(contents).toContain('on(handler: (message: UserEventsTopicMessage) => Promise<void> | void, options?: GeneratedConsumerSubscribeOptions<TRuntimeConsumer>): Promise<void>;');
     expect(contents).toContain("topicName: 'user.events'");
     expect(contents).toContain("'user.updated': producerMetadataByTopic.userEvents.userUpdated");
+    expect(contents).toContain([
+      'export interface GeneratedUserEventsConsumerTopic<TRuntimeConsumer extends RuntimeConsumer = RuntimeConsumer> {',
+      '  on(handler: (message: UserEventsTopicMessage) => Promise<void> | void, options?: GeneratedConsumerSubscribeOptions<TRuntimeConsumer>): Promise<void>;',
+      '  userCreated: {',
+      '    on(handler: (message: UserCreatedPayloadMessage) => Promise<void> | void, options?: GeneratedConsumerSubscribeOptions<TRuntimeConsumer>): Promise<void>;',
+      '  };',
+      '  userUpdated: {',
+      '    on(handler: (message: UserUpdatedPayloadMessage) => Promise<void> | void, options?: GeneratedConsumerSubscribeOptions<TRuntimeConsumer>): Promise<void>;',
+      '  };',
+      '}'
+    ].join('\n'));
   });
 
   it('supports the legacy advanced generated surface when explicitly requested', async () => {
@@ -105,6 +151,15 @@ describe('type generation', () => {
     expect(contents).toContain("export const TopicNames = {");
     expect(contents).toContain('export const producerEventMetadata');
     expect(contents).toContain('producer.send = ((');
+    expect(contents).toContain([
+      'export const EventNames = {',
+      "  UserCreated: 'user.created',",
+      '} as const;',
+      '',
+      'export const TopicNames = {',
+      "  UserEvents: 'user.events',",
+      '} as const;'
+    ].join('\n'));
   });
 
   it('emits only a source-file and index re-export for direct relative imports', async () => {
