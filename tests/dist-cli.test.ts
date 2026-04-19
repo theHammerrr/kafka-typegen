@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
@@ -7,9 +8,10 @@ import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const execFileAsync = promisify(execFile);
+const require = createRequire(import.meta.url);
 const cliPath = resolvePath('dist', 'cli.cjs');
 const schemaFixturesDir = resolvePath('tests', 'fixtures', 'schemas');
-const tsupCliPath = resolvePath('..', '..', 'node_modules', 'tsup', 'dist', 'cli-default.js');
+const tsupCliPath = require.resolve('tsup/dist/cli-default.js');
 const tempDirs: string[] = [];
 
 beforeAll(async () => {
