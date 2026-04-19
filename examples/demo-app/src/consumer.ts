@@ -17,15 +17,15 @@ const consumer = async () => {
         })
     )
 
-    consumer.userEvents.userCreated.on(async (message) => {
+    consumer.events.userCreated.on(async (message) => {
         console.log(`event ${message.event}, payload: ${JSON.stringify(message.payload)}`);
     });
 
-    consumer.userEvents.userDeleted.on(async (message) => {
+    consumer.events.userDeleted.on(async (message) => {
         console.log(`event ${message.event}, payload: ${JSON.stringify(message.payload)}`);
     })
 
-    consumer.productEvents.productCreated.on(async (message) => {
+    consumer.events.productCreated.on(async (message) => {
         const createdAt = new Date(message.payload.createdAt);
         const productId = message.payload.id;
         console.log(`event ${message.event}, payload: ${JSON.stringify(message.payload)}`);

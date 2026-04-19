@@ -16,7 +16,7 @@ const producer = async () => {
         })
     );
 
-    await producer.userEvents.userCreated.send({
+    await producer.events.userCreated.send({
         id: '123',
         email: 'user@example.com',
         isAdmin: false,
@@ -24,12 +24,11 @@ const producer = async () => {
         idempotent: true,
     })
 
-    await producer.userEvents.userDeleted.send({
+    await producer.events.userDeleted.send({
         id: '123',
     })
 
-
-    await producer.productEvents.productCreated.send({
+    await producer.events.productCreated.send({
         id: '456',
         name: 'Product 1',
         price: 9.99,
