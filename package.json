@@ -1,12 +1,30 @@
 {
   "name": "kafka-typegen",
   "version": "1.0.0",
-  "description": "Type-safe Kafka client generation from topic definitions and Avro schemas.",
+  "description": "Type-safe TypeScript Kafka client generation from Avro schemas, topic definitions, and Schema Registry-aware schema evolution workflows.",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/theHammerrr/kafka-typegen"
   },
+  "homepage": "https://github.com/theHammerrr/kafka-typegen#readme",
+  "bugs": {
+    "url": "https://github.com/theHammerrr/kafka-typegen/issues"
+  },
+  "keywords": [
+    "kafka",
+    "typescript",
+    "avro",
+    "schema-registry",
+    "schema-evolution",
+    "codegen",
+    "type-safe",
+    "kafkajs",
+    "confluent",
+    "event-driven",
+    "platformatic",
+    "cli"
+  ],
   "type": "module",
   "bin": {
     "kafka-typegen": "./dist/cli.cjs"

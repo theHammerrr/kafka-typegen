@@ -1,8 +1,4 @@
-import {
-  emitObservedEvent,
-  type ResolvedKafkaTypegenObservability,
-  toErrorString
-} from '../observability.js';
+import type { ResolvedKafkaTypegenObservability } from '../observability.js';
 import {
   type PlatformaticTopicSubscription,
   closePlatformaticConsumer,
@@ -12,13 +8,12 @@ import {
   buildPlatformaticConsumerOptionsSignature,
   reportPlatformaticConsumerError
 } from './platformatic-consumer-options.js';
-import { toRuntimeIncomingMessage } from './platformatic-message.js';
+import { attachPlatformaticConsumerStream } from './platformatic-consumer-stream.js';
 import type { RuntimeIncomingMessage, RuntimeTransportConsumer } from './types.js';
 import type {
   PlatformaticConsumerLike,
   PlatformaticConsumerSubscribeOptions,
-  PlatformaticConsumerTransportOptions,
-  PlatformaticMessage
+  PlatformaticConsumerTransportOptions
 } from './platformatic-types.js';
 
 type PlatformaticTopicHandler = (
@@ -75,43 +70,13 @@ export function createPlatformaticConsumerTransport<TKey = Buffer>(
         optionsSignature,
         stream
       });
-
-      stream.on('data', (message) => {
-        const runtimeMessage = toRuntimeIncomingMessage(message as PlatformaticMessage<TKey>);
-        for (const topicHandler of topicHandlers) {
-          void Promise.resolve(topicHandler(runtimeMessage)).catch(async (error) => {
-            observability?.logger.error('Platformatic topic handler failed.', {
-              error: toErrorString(error),
-              topicName
-            });
-            if (observability !== undefined) {
-              await emitObservedEvent(observability, {
-                error: toErrorString(error),
-                source: 'platformatic-handler',
-                topicName,
-                type: 'runtime.consumer.background-error'
-              });
-            }
-            reportPlatformaticConsumerError(error, options.onError);
-          });
-        }
-      });
-
-      stream.on('error', (error) => {
-        observability?.logger.error('Platformatic consumer stream error.', {
-          error: toErrorString(error),
-          topicName
-        });
-        if (observability !== undefined) {
-          void emitObservedEvent(observability, {
-            error: toErrorString(error),
-            source: 'platformatic-stream',
-            topicName,
-            type: 'runtime.consumer.background-error'
-          });
-        }
-        reportPlatformaticConsumerError(error, options.onError);
-      });
+      attachPlatformaticConsumerStream(
+        stream,
+        topicName,
+        topicHandlers,
+        options.onError,
+        observability
+      );
     },
     async stop() {
       await stopPlatformaticTopicStreams(subscriptionsByTopic);

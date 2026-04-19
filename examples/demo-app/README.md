@@ -4,8 +4,8 @@ This app lives outside the published library package and shows a real Platformat
 
 1. generate a typed Kafka client from an Avro schema
 2. create a Platformatic runtime with `kafka-typegen/runtime`
-3. produce typed events with the generated topic-first producer API
-4. consume typed events with the generated topic-first consumer API
+3. produce typed events with the generated producer API
+4. consume typed events with the generated consumer API
 
 ## Run It
 
@@ -36,15 +36,15 @@ pnpm produce
 - `schemas/product-created.avsc`
   - Avro schema for `product.created`, including a `timestamp-millis` logical type
 - `src/producer.ts`
-  - example producer using `producer.userEvents.userCreated.send(...)`, `producer.userEvents.userDeleted.send(...)`, and `producer.productEvents.productCreated.send(...)`
+  - example producer using the topic-first `producer.userEvents.*` and `producer.productEvents.*` API
 - `src/consumer.ts`
-  - example consumer using `consumer.userEvents.*` and `consumer.productEvents.*`
+  - example consumer using the topic-first `consumer.userEvents.*` and `consumer.productEvents.*` API
 - `src/generated/kafka`
-  - generated client checked in for inspection and example stability
+  - generated client output location after `pnpm demo` or `pnpm generate`; it is not checked into the repository
 
 ## Notes
 
 - The demo installs `@platformatic/kafka` because real Platformatic usage requires it.
 - The demo uses the `kafka-typegen` CLI and runtime package like a normal consumer project.
-- Producer and consumer lifecycle is user-managed, so the examples call `producer.close()` and `consumer.close()` explicitly.
-- The generated producer/consumer API is topic-first in the default `minimal` mode, so topic groups like `userEvents` and `productEvents` are the primary entrypoints.
+- Producer and consumer lifecycle is user-managed at the application level, so the examples call `producer.close()` and `consumer.close()` explicitly.
+- The demo uses the default `generation.apiMode: 'minimal'`, so the generated API is topic-first.

@@ -3,6 +3,7 @@ import { resolveObservability } from '../observability.js';
 import { createRuntimeClientProxy } from './client-proxy.js';
 import { createRuntimeConsumer } from './consumer-client.js';
 import { createPlatformaticConsumerTransport } from './platformatic-consumer.js';
+import { isRuntimeEventMetadata } from './runtime-event-metadata.js';
 import type {
   PlatformaticConsumerLike,
   PlatformaticConsumerSubscribeOptions,
@@ -10,7 +11,6 @@ import type {
 } from './platformatic-types.js';
 import type {
   RuntimeConsumer,
-  RuntimeEventMetadata,
   RuntimeSerializationOptions
 } from './types.js';
 
@@ -35,19 +35,6 @@ export type PlatformaticRuntimeConsumerOptions<
   RuntimeSerializationOptions & {
   readonly consumer: TConsumer;
 } & KafkaTypegenObservabilityOptions;
-
-function isRuntimeEventMetadata(value: unknown): value is RuntimeEventMetadata {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'eventName' in value &&
-    'payloadTypeName' in value &&
-    'schemaFilePath' in value &&
-    'schemaName' in value &&
-    'subjectName' in value &&
-    'topicName' in value
-  );
-}
 
 export function createPlatformaticRuntimeConsumer<
   TKey = Buffer,

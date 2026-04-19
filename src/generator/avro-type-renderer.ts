@@ -2,11 +2,13 @@ import { formatLiteral, formatPropertyName, indent } from './render-utils.js';
 import {
   type AvroTypeRenderContext,
   createChildRenderContext,
-  renderLogicalType,
   renderNamedTypeReference,
-  renderPrimitiveType,
   shouldRenderNamedReference
 } from './avro-render-helpers.js';
+import {
+  renderLogicalType,
+  renderPrimitiveType
+} from './avro-render-primitives.js';
 
 export function toTypeScriptType(
   avroType: unknown,

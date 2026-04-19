@@ -1,16 +1,45 @@
 # kafka-typegen
 
-`kafka-typegen` generates a type-safe TypeScript client from Kafka topic definitions and Avro schemas.
+`kafka-typegen` generates a type-safe TypeScript Kafka client from topic definitions, Avro schemas, and Schema Registry-aware event contracts.
 
-The goal is to make Kafka event contracts feel like a real application API instead of a loose collection of topic names and JSON blobs. You declare topics, events, and schema files once, and the generator produces:
+It is built for teams using Kafka, TypeScript, Avro, KafkaJS, Platformatic, and Confluent-compatible Schema Registry who want event contracts to feel like a real application API instead of a loose collection of topic names, JSON blobs, and hand-maintained wrapper code.
+
+Define topics, events, and schema files once, and `kafka-typegen` will:
 
 - payload interfaces derived from Avro
 - typed producer helpers grouped by topic and event
 - typed consumer helpers grouped by topic and event
 - topic-level consumer subscriptions for multi-event topics
 - a composed client API on top of a small runtime abstraction
+- dry-run and apply Schema Registry subject creation plus Kafka topic provisioning from the same config
+- surface schema drift and conservative schema evolution hints before you apply changes
 
 It supports both single-event and multi-event topics.
+
+## Why Teams Use It
+
+`kafka-typegen` is for the gap between "we have Avro schemas" and "our application code is actually safe to use."
+
+It helps when you want to:
+
+- generate TypeScript types from Avro schemas
+- ship typed KafkaJS or Platformatic producers and consumers
+- keep topic names, event names, and payload types aligned
+- plan Schema Registry subject changes before applying them
+- make schema evolution visible in CI instead of discovering breakage at runtime
+
+## Core Value
+
+Many Kafka toolchains stop at schema parsing. `kafka-typegen` goes further by treating your Kafka contract as both application code and infrastructure intent.
+
+That means one config can drive:
+
+- generated TypeScript client code for producers and consumers
+- Kafka topic planning and creation
+- Schema Registry subject creation
+- dry-run reporting for drift and schema evolution concerns
+
+The result is a workflow that is easier to review, easier to automate, and easier to trust in a TypeScript codebase.
 
 ## Stability
 
@@ -85,6 +114,19 @@ That generated module gives you:
 - optional native transport options as the last argument, for example `producer.userEvents.userCreated.send(payload, { acks: -1 })`
 - `createClient(runtime)` to bind producer and consumer together
 
+## Schema Evolution Workflow
+
+`kafka-typegen` does not try to rebrand Schema Registry compatibility as a generic migration system. A better description is that it helps with schema evolution workflows around Kafka topics and Schema Registry subjects.
+
+In practice, that means you can:
+
+- review planned Kafka topic and Schema Registry changes with `kafka-typegen sync`
+- apply missing topics and subjects with `kafka-typegen sync --apply`
+- surface detected drift for already-existing resources
+- get conservative hints for common schema evolution risks before a registry rejection surprises you
+
+Schema Registry remains the source of truth for compatibility enforcement. `kafka-typegen` helps you plan, review, and automate those changes from the same config that generates your typed client.
+
 ## Generated Imports
 
 The generated client is application-specific code, so it is not exported from the published `kafka-typegen` package itself. Generate it into your source tree and import it directly from the generated file or the generated `index.ts` re-export.
@@ -132,6 +174,14 @@ import {
 ```bash
 pnpm add kafka-typegen
 ```
+
+Common search terms this package fits:
+
+- TypeScript Kafka code generation
+- Avro to TypeScript Kafka client
+- KafkaJS typed producer and consumer
+- Schema Registry schema evolution tooling
+- Confluent Schema Registry with TypeScript
 
 If you want to use the first-party Platformatic adapter:
 
@@ -793,7 +843,10 @@ The Platformatic adapter:
 - wraps `consumer.consume({ topics: [...] })`
 - creates at most one consume stream per topic
 - fans messages out to all registered handlers for that topic
-- does not manage producer, consumer, or stream shutdown for you
+- exposes `stop()` to close active topic streams without closing the native consumer
+- exposes `close()` to close active topic streams and then close the native consumer
+- retries the native consumer close with a forced close when Platformatic reports an active-stream shutdown conflict
+- still expects application code to decide when producer and consumer shutdown should happen
 
 `runtime.transport` in `kafka-typegen.config.mjs` is still useful even if you import Platformatic helpers manually. It controls which runtime module path the generated client uses for its type imports. If you omit it, generated code defaults to `kafka-typegen/runtime`; if you set `transport: '@platformatic/kafka'`, generated code defaults to `kafka-typegen/runtime/platformatic`.
 
@@ -916,6 +969,7 @@ Supported behavior:
 - actionable validation and loading errors
 - `sync` command with dry-run by default
 - `sync --apply` to create missing Kafka topics and Schema Registry subjects
+- `sync --apply` to register a new Schema Registry subject version when registry drift is detected and `sync.schemaRegistry.onDrift` resolves to `register`
 - `sync --target kafka|registry|all`
 - `sync --json` for machine-readable sync output
 
@@ -936,7 +990,7 @@ The demo shows:
 
 - a local `kafka-typegen.config.mjs`
 - an Avro schema under `schemas/`
-- generated client output under `generated/`
+- generated client output written to `src/generated/kafka` when you run `pnpm demo` or `pnpm generate`
 - a small application that uses `createPlatformaticRuntimeClient(...)` from `kafka-typegen/runtime/platformatic`
 
 Run it with:
@@ -945,7 +999,9 @@ Run it with:
 cd examples/demo-app
 pnpm install
 pnpm demo
-pnpm start
+pnpm consume
+# in another terminal
+pnpm produce
 ```
 
 ## Package Exports
@@ -1002,13 +1058,14 @@ What this package does today:
 - ships a first-party `@platformatic/kafka` runtime adapter
 - can plan or create Kafka topics through the `sync` command
 - can plan or create Schema Registry subjects through the `sync` command
+- can register a new Schema Registry subject version when schema drift is detected and the configured drift policy allows registration
 
 What it does not do automatically:
 
 - manage runtime client lifecycle for you
 - generate multiple output files per config
 - mutate existing Kafka topics to reconcile drift
-- mutate existing Schema Registry subjects when schemas differ
+- mutate existing Schema Registry subjects when drift policy is configured to fail or ignore instead of register
 
 ## Status
 

@@ -1,111 +1,12 @@
-import { toTypeScriptType } from './avro-type-renderer.js';
 import {
   emitEnumOrFixedDeclaration,
-  getNamedTypeEntries,
-  registerNamedTypeReferences
+  getNamedTypeEntries
 } from './avro-declaration-helpers.js';
-import { formatLiteral, formatPropertyName, indent } from './render-utils.js';
+import { collectNestedDeclarations } from './avro-declaration-collector.js';
 
 export interface AvroDeclarationOutput {
   readonly declarations: readonly string[];
   readonly references: Readonly<Record<string, string>>;
-}
-
-function collectType(
-  avroType: unknown,
-  path: string,
-  references: Map<string, string>,
-  declarationsByName: Map<string, string>,
-  semanticMode: 'default' | 'safe'
-): void {
-  if (Array.isArray(avroType)) {
-    avroType.forEach((memberType, index) =>
-      collectType(
-        memberType,
-        `${path}[${index}]`,
-        references,
-        declarationsByName,
-        semanticMode
-      )
-    );
-    return;
-  }
-
-  if (avroType === null || typeof avroType !== 'object') {
-    return;
-  }
-
-  const typeRecord = avroType as Record<string, unknown>;
-  registerNamedTypeReferences(typeRecord, references);
-
-  if (Array.isArray(typeRecord.fields)) {
-    collectNamedRecord(
-      typeRecord,
-      path,
-      references,
-      declarationsByName,
-      semanticMode
-    );
-  }
-  emitEnumOrFixedDeclaration(typeRecord, declarationsByName);
-  collectType(
-    typeRecord.type,
-    `${path}.type`,
-    references,
-    declarationsByName,
-    semanticMode
-  );
-  collectType(
-    typeRecord.items,
-    `${path}.items`,
-    references,
-    declarationsByName,
-    semanticMode
-  );
-  collectType(
-    typeRecord.values,
-    `${path}.values`,
-    references,
-    declarationsByName,
-    semanticMode
-  );
-}
-
-function collectNamedRecord(
-  typeRecord: Record<string, unknown>,
-  path: string,
-  references: Map<string, string>,
-  declarationsByName: Map<string, string>,
-  semanticMode: 'default' | 'safe'
-): void {
-  if (typeof typeRecord.name !== 'string' || !Array.isArray(typeRecord.fields)) {
-    return;
-  }
-
-  const declaration = typeRecord.fields
-    .map((field, index) => {
-      const fieldRecord = field as Record<string, unknown>;
-      const fieldName =
-        typeof fieldRecord.name === 'string' ? formatPropertyName(fieldRecord.name) : "'unknown'";
-      collectType(
-        fieldRecord.type,
-        `${path}.fields[${index}].type`,
-        references,
-        declarationsByName,
-        semanticMode
-      );
-      return `${fieldName}: ${toTypeScriptType(fieldRecord.type, {
-        path: `${path}.fields[${index}].type`,
-        references: Object.fromEntries(references),
-        semanticMode
-      })};`;
-    })
-    .join('\n');
-
-  declarationsByName.set(
-    typeRecord.name,
-    `export interface ${typeRecord.name} {\n${indent(declaration)}\n}`
-  );
 }
 
 export function collectAvroDeclarations(
@@ -130,7 +31,7 @@ export function collectAvroDeclarations(
   const rootFields = Array.isArray(rootSchema.fields) ? rootSchema.fields : [];
   rootFields.forEach((field, index) => {
     const fieldRecord = field as Record<string, unknown>;
-    collectType(
+    collectNestedDeclarations(
       fieldRecord.type,
       `${String(rootSchema.name)}.fields[${index}].type`,
       references,
